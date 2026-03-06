@@ -1,4 +1,5 @@
 #include "attractor.hpp"
+#include "debuglog.h"
 #include "enemies.hpp"
 #include "entityblackhole.hpp"
 #include "game.hpp"
@@ -27,7 +28,7 @@ std::size_t particle::mIndex = 0;
 
 static int runThread(void* /*ptr*/)
 {
-    printf("Particle thread running\n");
+    debuglog::log(true,"Particle thread running\n");
 
     profiler prof("particle");
 
@@ -110,7 +111,7 @@ static int runThread(void* /*ptr*/)
         prof.stop();
     }
 
-    printf("Particle thread exiting\n");
+    debuglog::log(true,"Particle thread exiting\n");
 
     return 0;
 }
@@ -129,7 +130,7 @@ particle::particle()
     // Thread stuff
     mRunThread = SDL_CreateThread(runThread, "particle", nullptr);
     if (!mRunThread) {
-        printf("Couldn't create particle run thread: %s\n", SDL_GetError());
+        debuglog::log(true,"Couldn't create particle run thread: %s\n", SDL_GetError());
     }
 }
 
@@ -140,7 +141,7 @@ particle::~particle()
     int status = 0;
     SDL_WaitThread(mRunThread, &status);
 
-    printf("Particle thread exited with status %d\n", status);
+    debuglog::log(true,"Particle thread exited with status %d\n", status);
 
     for (auto& p: mParticles) {
         p.timeToLive = 0;

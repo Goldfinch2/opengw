@@ -1,8 +1,7 @@
 #include "controls.hpp"
+#include "debuglog.h"
 
 #include <SDL3/SDL_joystick.h>
-
-#include <cstdio>
 
 extern const bool* keyboardState;
 
@@ -12,7 +11,7 @@ constexpr float CLAMPVALUE = .3f;
 
 controls::controls()
 {
-    printf("Initing controls\n");
+    debuglog::log(true,"Initing controls\n");
 
     // Scan for initially connected gamepads
     scanForGamepads();
@@ -34,10 +33,10 @@ void controls::scanForGamepads()
     SDL_JoystickID* joysticks = SDL_GetJoysticks(&count);
 
     if (!joysticks) {
-        printf("SDL_GetJoysticks() failed: %s\n", SDL_GetError());
+        debuglog::log(true,"SDL_GetJoysticks() failed: %s\n", SDL_GetError());
     }
 
-    printf("Scanning for gamepads... Found %d joysticks\n", count);
+    debuglog::log(true,"Scanning for gamepads... Found %d joysticks\n", count);
 
     // Open any available gamepads
     for (int j = 0; j < count && mNumGamepads < MAX_GAMEPADS; j++) {
@@ -61,7 +60,7 @@ void controls::scanForGamepads()
                     if (!mGamepads[i]) {
                         mGamepads[i] = SDL_OpenGamepad(j);
                         if (mGamepads[i]) {
-                            printf("Gamepad %d: %s\n", i,
+                            debuglog::log(true,"Gamepad %d: %s\n", i,
                                    SDL_GetGamepadName(mGamepads[i]));
                             mNumGamepads++;
                         }
@@ -74,7 +73,7 @@ void controls::scanForGamepads()
 
     SDL_free(joysticks);
 
-    printf("Total gamepads opened: %d\n", mNumGamepads);
+    debuglog::log(true,"Total gamepads opened: %d\n", mNumGamepads);
 }
 
 void controls::handleGamepadAdded(SDL_JoystickID instanceId)
@@ -87,11 +86,11 @@ void controls::handleGamepadAdded(SDL_JoystickID instanceId)
         if (!mGamepads[i]) {
             mGamepads[i] = SDL_OpenGamepad(instanceId);
             if (mGamepads[i]) {
-                printf("Gamepad connected in slot %d: %s\n", i,
+                debuglog::log(true,"Gamepad connected in slot %d: %s\n", i,
                        SDL_GetGamepadName(mGamepads[i]));
                 mNumGamepads++;
             } else {
-                printf("Failed to open gamepad %d: %s\n", instanceId, SDL_GetError());
+                debuglog::log(true,"Failed to open gamepad %d: %s\n", instanceId, SDL_GetError());
             }
             break;
         }
@@ -105,7 +104,7 @@ void controls::handleGamepadRemoved(SDL_JoystickID instanceId)
         if (mGamepads[i]) {
             SDL_Joystick* joy = SDL_GetGamepadJoystick(mGamepads[i]);
             if (SDL_GetJoystickID(joy) == instanceId) {
-                printf("Gamepad disconnected from slot %d\n", i);
+                debuglog::log(true,"Gamepad disconnected from slot %d\n", i);
                 SDL_CloseGamepad(mGamepads[i]);
                 mGamepads[i] = nullptr;
                 mNumGamepads--;

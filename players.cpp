@@ -1,4 +1,5 @@
 #include "players.hpp"
+#include "debuglog.h"
 #include "enemies.hpp"
 #include "entityPlayer1.hpp"
 #include "entityPlayer2.hpp"
@@ -17,15 +18,19 @@ players::players(const game& gameRef) : mGame(gameRef)
 {
     mPlayer1 = std::make_unique<entityPlayer1>(gameRef);
     mPlayer1->setState(entity::ENTITY_STATE_INACTIVE);
+    mPlayer1->mJoined = false;
 
     mPlayer2 = std::make_unique<entityPlayer2>();
     mPlayer2->setState(entity::ENTITY_STATE_INACTIVE);
+    mPlayer2->mJoined = false;
 
     mPlayer3 = std::make_unique<entityPlayer3>();
     mPlayer3->setState(entity::ENTITY_STATE_INACTIVE);
+    mPlayer3->mJoined = false;
 
     mPlayer4 = std::make_unique<entityPlayer4>();
     mPlayer4->setState(entity::ENTITY_STATE_INACTIVE);
+    mPlayer4->mJoined = false;
 }
 
 players::~players()
@@ -112,7 +117,7 @@ void players::run()
             currentPlayer->destroy();
             break;
         default:
-            printf("Unhandled player state\n");
+            debuglog::log(true,"Unhandled player state\n");
             break;
         }
     }

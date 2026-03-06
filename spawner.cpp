@@ -1,4 +1,5 @@
 #include "bomb.hpp"
+#include "debuglog.h"
 #include "defines.hpp"
 #include "spawner.hpp"
 #include "enemies.hpp"
@@ -275,7 +276,7 @@ void spawner::run(void)
 // Not currently used
 void spawner::transition()
 {
-    printf("New spawnIndex = %d, amount %f\n", getSpawnIndex(), mSpawnProgress);
+    debuglog::log(true,"New spawnIndex = %d, amount %f\n", getSpawnIndex(), mSpawnProgress);
 }
 
 void spawner::spawnEntities(entity::EntityType type, int numWanted)

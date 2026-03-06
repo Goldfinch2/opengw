@@ -1,5 +1,6 @@
 #include "attractor.hpp"
 #include "bomb.hpp"
+#include "debuglog.h"
 #include "controls.hpp"
 #include "defines.hpp"
 #include "game.hpp"
@@ -284,7 +285,7 @@ void player::runMissiles()
                 missile->destroy();
                 break;
             default:
-                printf("Unhandled missile state\n");
+                debuglog::log(true,"Unhandled missile state\n");
                 break;
             }
         }

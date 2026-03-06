@@ -5,6 +5,7 @@
 //
 
 #include "attractor.hpp"
+#include "debuglog.h"
 #include "game.hpp"
 #include "grid.hpp"
 #include "mathutils.hpp"
@@ -15,8 +16,6 @@
 #include <atomic>
 //#include <mutex>
 #include <vector>
-
-#include <cstdio>
 
 #include "renderer.h"
 
@@ -73,7 +72,7 @@ static int runThread(void* /*ptr*/)
 {
     profiler prof("grid");
 
-    printf("Grid thread running\n");
+    debuglog::log(true,"Grid thread running\n");
 
     while (!quitFlag) {
         while (!mRunFlag && !quitFlag) {
@@ -171,7 +170,7 @@ static int runThread(void* /*ptr*/)
         prof.stop();
     }
 
-    printf("Grid thread exiting\n");
+    debuglog::log(true,"Grid thread exiting\n");
 
     return 0;
 }
@@ -202,7 +201,7 @@ grid::grid()
     // Thread stuff
     mRunThread = SDL_CreateThread(runThread, "grid", nullptr);
     if (!mRunThread) {
-        printf("Couldn't create grid run thread: %s\n", SDL_GetError());
+        debuglog::log(true,"Couldn't create grid run thread: %s\n", SDL_GetError());
     }
 }
 
@@ -213,7 +212,7 @@ grid::~grid()
     int status = 0;
     SDL_WaitThread(mRunThread, &status);
 
-    printf("Grid thread exited with status %d\n", status);
+    debuglog::log(true,"Grid thread exited with status %d\n", status);
 }
 
 void grid::initializeVertices()
@@ -225,6 +224,9 @@ void grid::initializeVertices()
 #ifdef GRID_GLOW
     const vector::pen darkColor(0.2f, 0.2f, 1.0f, (0.15f * ((scene::mPass == scene::RENDERPASS_PRIMARY) ? 0.75f : 0.25f)) * brightness, 0);
     const vector::pen lightColor(0.2f, 0.2f, 1.0f, (0.4f * ((scene::mPass == scene::RENDERPASS_PRIMARY) ? 0.75f : 0.25f)) * brightness, 0);
+#elif defined(USE_DVG_RENDERER)
+    const vector::pen darkColor(0.3f, 0.3f, 1.0f, 0.4f * brightness, 0);
+    const vector::pen lightColor(0.3f, 0.3f, 1.0f, 1.0f * brightness, 0);
 #else
     const vector::pen darkColor(0.4f, 0.4f, 1.0f, 0.15f * brightness, 0);
     const vector::pen lightColor(0.4f, 0.4f, 1.0f, 0.4f * brightness, 0);

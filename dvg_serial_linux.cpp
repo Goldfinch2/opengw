@@ -2,6 +2,7 @@
 #ifndef _WIN32
 
 #include "dvg_serial.h"
+#include "debuglog.h"
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -21,7 +22,7 @@ namespace dvg_serial
         g_serialFd = ::open(portName, O_RDWR | O_NOCTTY);
         if (g_serialFd < 0)
         {
-            printf("dvg_serial: failed to open %s (%s)\n", portName, strerror(errno));
+            debuglog::log(true,"dvg_serial: failed to open %s (%s)\n", portName, strerror(errno));
             return false;
         }
 
@@ -29,7 +30,7 @@ namespace dvg_serial
         memset(&tios, 0, sizeof(tios));
         if (tcgetattr(g_serialFd, &tios) < 0)
         {
-            printf("dvg_serial: tcgetattr failed (%s)\n", strerror(errno));
+            debuglog::log(true,"dvg_serial: tcgetattr failed (%s)\n", strerror(errno));
             ::close(g_serialFd);
             g_serialFd = -1;
             return false;
@@ -44,13 +45,13 @@ namespace dvg_serial
 
         if (tcsetattr(g_serialFd, TCSANOW, &tios) < 0)
         {
-            printf("dvg_serial: tcsetattr failed (%s)\n", strerror(errno));
+            debuglog::log(true,"dvg_serial: tcsetattr failed (%s)\n", strerror(errno));
             ::close(g_serialFd);
             g_serialFd = -1;
             return false;
         }
 
-        printf("dvg_serial: opened %s\n", portName);
+        debuglog::log(true,"dvg_serial: opened %s\n", portName);
         return true;
     }
 
@@ -61,7 +62,7 @@ namespace dvg_serial
             tcdrain(g_serialFd);
             ::close(g_serialFd);
             g_serialFd = -1;
-            printf("dvg_serial: closed\n");
+            debuglog::log(true,"dvg_serial: closed\n");
         }
     }
 

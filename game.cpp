@@ -1,6 +1,7 @@
 #include "attractor.hpp"
 #include "blackholes.hpp"
 #include "bomb.hpp"
+#include "debuglog.h"
 #include "camera.hpp"
 #include "controls.hpp"
 #include "defines.hpp"
@@ -168,7 +169,7 @@ game::~game()
 
 void game::quitThreads()
 {
-    printf("%s\n", __func__);
+    debuglog::log(true,"%s\n", __func__);
     mParticles.reset();
     mGrid.reset();
 }

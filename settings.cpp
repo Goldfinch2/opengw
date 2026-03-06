@@ -1,4 +1,5 @@
 #include "settings.hpp"
+#include "debuglog.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -39,7 +40,7 @@ settings::settings()
 
 #if defined(USE_DVG_RENDERER)
     mParticles = 100;
-    gridSpacing = 20;
+    gridSpacing = 10;
     targetFps = 40;
     dvgRefreshRate = 40;
 #else
@@ -101,11 +102,11 @@ void settings::load()
 {
     FILE* file = fopen("settings.txt", "r");
     if (!file) {
-        printf("settings.txt not found, using defaults\n");
+        debuglog::log(true,"settings.txt not found, using defaults\n");
         return;
     }
 
-    printf("Loading settings.txt\n");
+    debuglog::log(true, "Loading settings.txt\n");
 
     // Section tracking: 0 = global (applies to all), 1 = sdl, 2 = dvg
     enum Section { SECTION_GLOBAL, SECTION_SDL, SECTION_DVG };
@@ -135,7 +136,7 @@ void settings::load()
             else if (strcmp(buffer, "[dvg]") == 0)
                 section = SECTION_DVG;
             else
-                printf("settings: unknown section '%s'\n", buffer);
+                debuglog::log(true,"settings: unknown section '%s'\n", buffer);
             continue;
         }
 
@@ -150,7 +151,7 @@ void settings::load()
         if (!value) continue;
 
         if (!applyKey(*this, key, value))
-            printf("settings: unknown key '%s'\n", key);
+            debuglog::log(true,"settings: unknown key '%s'\n", key);
     }
 
     fclose(file);

@@ -29,4 +29,4 @@ sort_vectors true
 attractors 50
 particles 100
 grid_passes 4
-grid_spacing 20
+grid_spacing 10

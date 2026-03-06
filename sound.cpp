@@ -1,12 +1,11 @@
 #include "sound.hpp"
-
-#include <cstdio>
+#include "debuglog.h"
 
 constexpr std::size_t NUM_TRACKS = 200;
 
 sound::sound()
 {
-    printf("Initing sound\n");
+    debuglog::log(true,"Initing sound\n");
 
     sound::mTracks.resize(NUM_TRACKS);
 
@@ -15,7 +14,7 @@ sound::sound()
                                        &spec, sdl3AudioCallback, this);
 
     if (!stream) {
-        fprintf(stderr, "SDL_OpenAudioDeviceStream() failed: %s\n", SDL_GetError());
+        debuglog::log(true, "SDL_OpenAudioDeviceStream() failed: %s\n", SDL_GetError());
     }
 
     for (auto& track: mTracks) {
@@ -42,12 +41,12 @@ void sound::sdl3AudioCallback(void* userdata, SDL_AudioStream* stream, int addit
         if (data) {
             bufferCallback(userdata, data, additional_amount);
             if (!SDL_PutAudioStreamData(stream, data, additional_amount)) {
-                fprintf(stderr, "SDL_PutAudioStreamData() failed: %s\n", SDL_GetError());
+                debuglog::log(true, "SDL_PutAudioStreamData() failed: %s\n", SDL_GetError());
             }
             SDL_stack_free(data);
         }
     } else {
-        fprintf(stderr, "SDL_stack_alloc() failed: %s\n", SDL_GetError());
+        debuglog::log(true, "SDL_stack_alloc() failed: %s\n", SDL_GetError());
     }
 }
 
@@ -126,11 +125,11 @@ void sound::loadTrack(const char* file, std::size_t track, float volume, bool lo
 
     // Load the sound file and convert it to 16-bit stereo at 44Hz
     if (!SDL_LoadWAV(file, &wave, &srcData, &srcLen)) {
-        printf("Failed loading audio track %zu: %s\n", track, SDL_GetError());
+        debuglog::log(true,"Failed loading audio track %zu: %s\n", track, SDL_GetError());
         return;
     }
 
-    printf("Loaded audio track %zu\n", track);
+    debuglog::log(true,"Loaded audio track %zu\n", track);
 
     Uint8* dstData = nullptr;
     int dstLen = 0;
@@ -146,7 +145,7 @@ void sound::loadTrack(const char* file, std::size_t track, float volume, bool lo
         mTracks[track].vol = volume;
         mTracks[track].playing = false;
     } else {
-        fprintf(stderr, "SDL_ConvertAudioSamples() failed: %s\n", SDL_GetError());
+        debuglog::log(true, "SDL_ConvertAudioSamples() failed: %s\n", SDL_GetError());
     }
 
 
@@ -158,7 +157,7 @@ void sound::startSound()
 {
     if (stream) {
         if (!SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(stream))) {
-            fprintf(stderr, "SDL_ResumeAudioDevice() failed: %s\n", SDL_GetError());
+            debuglog::log(true, "SDL_ResumeAudioDevice() failed: %s\n", SDL_GetError());
         }
     }
 }
@@ -167,7 +166,7 @@ void sound::stopSound()
 {
     if (stream) {
         if (!SDL_PauseAudioDevice(SDL_GetAudioStreamDevice(stream))) {
-            fprintf(stderr, "SDL_PauseAudioDevice() failed: %s\n", SDL_GetError());
+            debuglog::log(true, "SDL_PauseAudioDevice() failed: %s\n", SDL_GetError());
         }
     }
 }

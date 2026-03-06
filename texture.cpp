@@ -1,4 +1,5 @@
 #include "texture.hpp"
+#include "debuglog.h"
 
 texture::texture(void)
 {
@@ -29,7 +30,7 @@ void texture::load(const char* filename)
 
     // If there's an error, display it.
     if (error != 0) {
-        printf("texture::load(%s) error: %s\n", filename, lodepng_error_text(error));
+        debuglog::log(true,"texture::load(%s) error: %s\n", filename, lodepng_error_text(error));
         return;
     }
 

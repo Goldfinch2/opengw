@@ -6,6 +6,7 @@
 
 #include "renderer.h"
 #include "renderer_dvg.h"
+#include "debuglog.h"
 #include "dvg_serial.h"
 #include "settings.hpp"
 
@@ -94,8 +95,8 @@ static bool worldToDvg(float wx, float wy, int32_t* outX, int32_t* outY)
     float halfFovRad = (g_fovY * 0.5f) * (3.14159265f / 180.0f);
     float tanHalf = tanf(halfFovRad);
     float visHalfH = -ez * tanHalf;
-    float aspect = (float)g_screenWidth / (float)g_screenHeight;
-    float visHalfW = visHalfH * aspect;
+    // DVG display is square — use 1:1 aspect for correct proportions
+    float visHalfW = visHalfH;
 
     // NDC: -1..1
     float nx = ex / visHalfW;
@@ -251,6 +252,9 @@ static void addVec(int32_t x0, int32_t y0, int32_t x1, int32_t y1,
 static void addWorldLine(float x0, float y0, float x1, float y1,
                           float r, float g, float b, float a)
 {
+    // Skip nearly-invisible lines (e.g. spawn animation fading copies)
+    if (a < 0.1f) return;
+
     int32_t dx0, dy0, dx1, dy1;
     if (!worldToDvg(x0, y0, &dx0, &dy0)) return;
     if (!worldToDvg(x1, y1, &dx1, &dy1)) return;
@@ -273,7 +277,7 @@ static void getDvgInfo()
 
     if (dvg_serial::write(cmd_buf, 4) != 4)
     {
-        printf("getDvgInfo: write failed\n");
+        debuglog::log(true,"getDvgInfo: write failed\n");
         return;
     }
 
@@ -281,7 +285,7 @@ static void getDvgInfo()
     int ackRead = dvg_serial::read(&ack, 4);
     if (ackRead != 4)
     {
-        printf("getDvgInfo: ack read failed (got %d bytes)\n", ackRead);
+        debuglog::log(true,"getDvgInfo: ack read failed (got %d bytes)\n", ackRead);
         return;
     }
 
@@ -289,12 +293,12 @@ static void getDvgInfo()
     int lenRead = dvg_serial::read(&jsonLen, 4);
     if (lenRead != 4)
     {
-        printf("getDvgInfo: length read failed (got %d bytes)\n", lenRead);
+        debuglog::log(true,"getDvgInfo: length read failed (got %d bytes)\n", lenRead);
         return;
     }
     if (jsonLen == 0 || jsonLen >= DVG_MAX_JSON_SIZE)
     {
-        printf("getDvgInfo: bad length %u\n", jsonLen);
+        debuglog::log(true,"getDvgInfo: bad length %u\n", jsonLen);
         return;
     }
 
@@ -302,7 +306,7 @@ static void getDvgInfo()
     int jsonRead = dvg_serial::read(jsonBuf, jsonLen);
     if (jsonRead != (int)jsonLen)
     {
-        printf("getDvgInfo: payload read failed (got %d of %u bytes)\n", jsonRead, jsonLen);
+        debuglog::log(true,"getDvgInfo: payload read failed (got %d of %u bytes)\n", jsonRead, jsonLen);
         return;
     }
     jsonBuf[jsonLen] = '\0';
@@ -315,8 +319,8 @@ static void getDvgInfo()
         g_verticalDisplay = (strncmp(p, "true", 4) == 0);
     }
 
-    printf("DVG JSON: %s\n", jsonBuf);
-    printf("DVG orientation: vertical=%d\n", g_verticalDisplay);
+    debuglog::log(true,"DVG JSON: %s\n", jsonBuf);
+    debuglog::log(true,"DVG orientation: vertical=%d\n", g_verticalDisplay);
 }
 
 // ─── Serial I/O ──────────────────────────────────────────────────────────────
@@ -527,14 +531,14 @@ void init(int width, int height)
 
     if (!s.serialPort[0])
     {
-        printf("DVG renderer: no serial_port configured in settings.txt\n");
-        printf("DVG renderer: running without hardware (vector count will be logged)\n");
+        debuglog::log(true,"DVG renderer: no serial_port configured in settings.txt\n");
+        debuglog::log(true,"DVG renderer: running without hardware (vector count will be logged)\n");
         return;
     }
 
     if (!dvg_serial::open(s.serialPort))
     {
-        printf("DVG renderer: failed to open %s\n", s.serialPort);
+        debuglog::log(true,"DVG renderer: failed to open %s\n", s.serialPort);
         return;
     }
 
@@ -545,7 +549,7 @@ void init(int width, int height)
     if (cfgFps > 60) cfgFps = 60;
     g_targetFps = (uint32_t)cfgFps;
 
-    printf("DVG renderer initialized — %u fps\n", g_targetFps);
+    debuglog::log(true,"DVG renderer initialized — %u fps\n", g_targetFps);
 }
 
 void shutdown()
@@ -569,7 +573,7 @@ void shutdown()
     free(g_cmdBuf);  g_cmdBuf  = nullptr;
     free(g_vecList); g_vecList = nullptr;
 
-    printf("DVG renderer shutdown\n");
+    debuglog::log(true,"DVG renderer shutdown\n");
 }
 
 void beginFrame(int width, int height)
@@ -586,7 +590,7 @@ void present()
 {
     static uint32_t frameCount = 0;
     if (++frameCount % 120 == 0)
-        printf("DVG: %u vectors this frame\n", g_vecCnt);
+        debuglog::log(true,"DVG: %u vectors this frame\n", g_vecCnt);
 
     if (dvg_serial::isOpen() && g_vecCnt > 0)
         serialSend();

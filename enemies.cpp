@@ -1,9 +1,8 @@
 #include "enemies.hpp"
+#include "debuglog.h"
 #include "entityblackhole.hpp"
 #include "entityline.hpp"
 #include "game.hpp"
-
-#include <cstdio>
 
 static int idxWandererStart;
 static int idxWandererEnd;
@@ -140,7 +139,7 @@ enemies::enemies(const game& gameRef) : mGame(gameRef)
         idxProtonEnd = entity - 1;
     }
 
-    printf("Num enemies created = %d\n", entity);
+    debuglog::log(true,"Num enemies created = %d\n", entity);
 
     // Fill the rest of the list with empty entries
     for (int i = entity; i < NUM_ENEMIES; i++) {
@@ -350,7 +349,7 @@ int enemies::getNumActiveEnemiesOfType(const entity::EntityType& type)
         idxEnd = idxProtonEnd;
         break;
     default:
-        printf("Unhandled enemy type\n");
+        debuglog::log(true,"Unhandled enemy type\n");
         break;
     }
 
@@ -411,7 +410,7 @@ entity* enemies::getUnusedEnemyOfType(const entity::EntityType& type)
         idxEnd = idxProtonEnd;
         break;
     default:
-        printf("Unhandled enemy type\n");
+        debuglog::log(true,"Unhandled enemy type\n");
         break;
     }
 

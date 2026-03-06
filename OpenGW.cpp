@@ -1,4 +1,5 @@
 #include "controls.hpp"
+#include "debuglog.h"
 #include "game.hpp"
 #include "scene.hpp"
 #include "settings.hpp"
@@ -36,9 +37,9 @@ static SDL_GLContext context;
 static bool oglInited = false;
 static unsigned int texOffscreen;
 
-static void OGLCreate(int width, int height);
-static void OGLDestroy();
-static void OGLSize(int cx, int cy);
+static void createContext(int width, int height);
+static void destroyContext();
+static void resizeViewport(int cx, int cy);
 static void createOffscreens();
 static void drawOffscreens();
 
@@ -78,7 +79,7 @@ static bool handleEvents()
             break;
 #if !defined(USE_DVG_RENDERER)
         case SDL_EVENT_WINDOW_RESIZED:
-            OGLSize(e.window.data1, e.window.data2);
+            resizeViewport(e.window.data1, e.window.data2);
             break;
 #endif
         case SDL_EVENT_GAMEPAD_ADDED:
@@ -142,15 +143,17 @@ static void run()
 
 int main(int /*argc*/, char** /*argv*/)
 {
-    printf("SDL_Init\n");
+    debuglog::init();
+    debuglog::log(true, "OpenGW SDL\n");
+
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD)) {
         // No display server — try KMSDRM
         SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "kmsdrm");
         if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD)) {
-            printf("SDL_Init failed: %s\n", SDL_GetError());
+            debuglog::log(true, "SDL_Init failed: %s\n", SDL_GetError());
             return 0;
         }
-        printf("No display server, using kmsdrm video driver\n");
+        debuglog::log(true, "No display server, using kmsdrm video driver\n");
     }
 
     // Detect display resolution
@@ -162,7 +165,7 @@ int main(int /*argc*/, char** /*argv*/)
         if (dm) {
             displayWidth = dm->w;
             displayHeight = dm->h;
-            printf("Display mode: %dx%d\n", displayWidth, displayHeight);
+            debuglog::log(true, "Display mode: %dx%d\n", displayWidth, displayHeight);
         }
     }
 
@@ -175,46 +178,49 @@ int main(int /*argc*/, char** /*argv*/)
         SDL_HideCursor();
         srand(SDL_GetTicks());
         make_sin_cos_tables();
-        OGLCreate(displayWidth, displayHeight);
+        g_scene.init();
+        createContext(displayWidth, displayHeight);
         run();
-        OGLDestroy();
+        g_scene.shutdown();
+        destroyContext();
 
         SDL_DestroyWindow(window);
     } else {
-        printf("Failed to create window: %s\n", SDL_GetError());
+        debuglog::log(true, "Failed to create window: %s\n", SDL_GetError());
     }
 
-    printf("SDL_Quit\n");
+    debuglog::log(true, "SDL_Quit\n");
+    debuglog::close();
     SDL_Quit();
 
     return 0;
 }
 
-static void OGLCreate(int width, int height)
+static void createContext(int width, int height)
 {
     context = SDL_GL_CreateContext(window);
 
     if (context == nullptr) {
-        printf("SDL_GL_CreateContext failed: %s\n", SDL_GetError());
+        debuglog::log(true, "SDL_GL_CreateContext failed: %s\n", SDL_GetError());
     }
 
-    OGLSize(width, height);
+    resizeViewport(width, height);
 
     // Do stuff with the context here if needed...
     createOffscreens();
 
     if (!SDL_GL_SetSwapInterval(0)) {
-        printf("SDL_GL_SetSwapInterval failed: %s\n", SDL_GetError());
+        debuglog::log(true, "SDL_GL_SetSwapInterval failed: %s\n", SDL_GetError());
     }
 
     if (!SDL_GL_MakeCurrent(window, context)) {
-        printf("SDL_GL_MakeCurrent failed: %s\n", SDL_GetError());
+        debuglog::log(true, "SDL_GL_MakeCurrent failed: %s\n", SDL_GetError());
     }
 
     oglInited = true;
 }
 
-static void OGLDestroy()
+static void destroyContext()
 {
     oglInited = false;
 
@@ -222,7 +228,7 @@ static void OGLDestroy()
     SDL_GL_DestroyContext(context);
 }
 
-static void OGLSize(int cx, int cy)
+static void resizeViewport(int cx, int cy)
 {
     g_scene.size(cx, cy);
     mWidth = cx;
@@ -346,6 +352,8 @@ static void updateFps(Uint32 now)
 // ============================================================================
 #else // USE_DVG_RENDERER
 
+extern scene g_scene;
+
 static void run()
 {
     constexpr Uint32 logicRate = 60;
@@ -387,14 +395,16 @@ static void run()
 
 int main(int /*argc*/, char** /*argv*/)
 {
-    printf("OpenGW DVG\n");
+    debuglog::init();
+    debuglog::log(true, "OpenGW DVG\n");
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD)) {
         SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "kmsdrm");
         if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD)) {
-            printf("SDL_Init failed: %s\n", SDL_GetError());
+            debuglog::log(true, "SDL_Init failed: %s\n", SDL_GetError());
             return 1;
         }
+        debuglog::log(true, "No display server, using kmsdrm video driver\n");
     }
 
     // Detect display resolution (used for aspect ratio calculation)
@@ -406,7 +416,7 @@ int main(int /*argc*/, char** /*argv*/)
         if (dm) {
             mWidth = dm->w;
             mHeight = dm->h;
-            printf("Display: %dx%d\n", mWidth, mHeight);
+            debuglog::log(true, "Display: %dx%d\n", mWidth, mHeight);
         }
     }
 
@@ -414,7 +424,8 @@ int main(int /*argc*/, char** /*argv*/)
     window = SDL_CreateWindow("OpenGW DVG", mWidth, mHeight,
                                           SDL_WINDOW_FULLSCREEN);
     if (!window) {
-        printf("Failed to create window: %s\n", SDL_GetError());
+        debuglog::log(true, "Failed to create window: %s\n", SDL_GetError());
+        debuglog::close();
         SDL_Quit();
         return 1;
     }
@@ -423,6 +434,14 @@ int main(int /*argc*/, char** /*argv*/)
     srand(SDL_GetTicks());
     make_sin_cos_tables();
 
+    g_scene.init();
+
+    debuglog::log(true, "Game created, gameMode=%d gameType=%d\n", game::mGameMode, game::mGameType);
+    debuglog::log(true, "Player1 joined=%d state=%d\n", theGame->getPlayer1()->mJoined, theGame->getPlayer1()->getState());
+    debuglog::log(true, "Player2 joined=%d state=%d\n", theGame->getPlayer2()->mJoined, theGame->getPlayer2()->getState());
+    debuglog::log(true, "Player3 joined=%d state=%d\n", theGame->getPlayer3()->mJoined, theGame->getPlayer3()->getState());
+    debuglog::log(true, "Player4 joined=%d state=%d\n", theGame->getPlayer4()->mJoined, theGame->getPlayer4()->getState());
+
     renderer::init(mWidth, mHeight);
 
     // Force single player, skip selection screen
@@ -430,14 +449,24 @@ int main(int /*argc*/, char** /*argv*/)
     theGame->getPlayer1()->mJoined = true;
     theGame->startGame(game::GAMETYPE_SINGLEPLAYER);
 
+    debuglog::log(true, "startGame called, gameMode=%d gameType=%d\n", game::mGameMode, game::mGameType);
+    debuglog::log(true, "Player1 joined=%d state=%d\n", theGame->getPlayer1()->mJoined, theGame->getPlayer1()->getState());
+    debuglog::log(true, "Player2 joined=%d state=%d\n", theGame->getPlayer2()->mJoined, theGame->getPlayer2()->getState());
+    debuglog::log(true, "Player3 joined=%d state=%d\n", theGame->getPlayer3()->mJoined, theGame->getPlayer3()->getState());
+    debuglog::log(true, "Player4 joined=%d state=%d\n", theGame->getPlayer4()->mJoined, theGame->getPlayer4()->getState());
+    debuglog::log(true, "numPlayers=%d\n", theGame->numPlayers());
+
     run();
 
+    g_scene.shutdown();
     renderer::shutdown();
+
+    debuglog::log(true, "Done\n");
+    debuglog::close();
 
     SDL_DestroyWindow(window);
     SDL_Quit();
 
-    printf("Done\n");
     return 0;
 }
 

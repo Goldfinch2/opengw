@@ -1,3 +1,4 @@
+#include "debuglog.h"
 #include "defines.hpp"
 #include "font.hpp"
 #include "game.hpp"
@@ -33,8 +34,6 @@ vector::pen defaultFontPen(0, 1, 0, .6, 3);
 
 scene::scene()
 {
-    theGame = std::make_unique<game>();
-
     mAttractModeTimer = 0;
     mShowHighScores = false;
 
@@ -81,11 +80,23 @@ scene::scene()
     mShieldSymbol.mEdgeList[i++].to = 11;
 }
 
-scene::~scene()
+void scene::init()
 {
-    printf("%s\n", __func__);
+    theGame = std::make_unique<game>();
+}
+
+void scene::shutdown()
+{
+    if (!theGame)
+        return;
+    debuglog::log(true, "%s\n", __func__);
     theGame->quitThreads();
     theGame.reset();
+}
+
+scene::~scene()
+{
+    shutdown();
 }
 
 void scene::run()

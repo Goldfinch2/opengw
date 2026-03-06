@@ -15,6 +15,8 @@ class scene
     scene();
     ~scene();
 
+    void init();
+    void shutdown();
     void run();
     void draw(int pass);
     void size(float w, float h)
