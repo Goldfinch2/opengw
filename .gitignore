@@ -19,6 +19,7 @@ Release/
 
 # Runtime
 scores.sav
+opengw.log
 
 # OS
 .DS_Store
