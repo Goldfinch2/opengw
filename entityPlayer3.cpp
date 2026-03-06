@@ -1,0 +1,89 @@
+#include "entityPlayer3.hpp"
+#include "game.hpp"
+#include "grid.hpp"
+
+entityPlayer3::entityPlayer3()
+    : player()
+{
+    mPlayerAssignment = 2;
+
+    mType = ENTITY_TYPE_PLAYER3;
+
+    mScale = .1;
+    mRadius = 2;
+
+    mPen = vector::pen(1, .6, .2, 1, 12);
+    mExhaustPen = vector::pen(1, .6, .2, 40, 5);
+    mMissilesPen = vector::pen(1, .6, .2, 40, 5);
+    mFontPen = vector::pen(1, .6, .2, 40, 5);
+
+    int i = 0;
+
+    mModel.mVertexList.resize(12);
+
+    mModel.mVertexList[i++] = Point3d(0, 15);
+    mModel.mVertexList[i++] = Point3d(5, -2);
+    mModel.mVertexList[i++] = Point3d(0, -11);
+    mModel.mVertexList[i++] = Point3d(-5, -2);
+
+    mModel.mVertexList[i++] = Point3d(11, 9);
+    mModel.mVertexList[i++] = Point3d(18, -2);
+    mModel.mVertexList[i++] = Point3d(6, -11);
+    mModel.mVertexList[i++] = Point3d(12, -2);
+
+    mModel.mVertexList[i++] = Point3d(-11, 9);
+    mModel.mVertexList[i++] = Point3d(-18, -2);
+    mModel.mVertexList[i++] = Point3d(-6, -11);
+    mModel.mVertexList[i++] = Point3d(-12, -2);
+
+    i = 0;
+
+    mModel.mEdgeList.resize(12);
+    mModel.mEdgeList[i].from = 0;
+    mModel.mEdgeList[i++].to = 1;
+    mModel.mEdgeList[i].from = 1;
+    mModel.mEdgeList[i++].to = 2;
+    mModel.mEdgeList[i].from = 2;
+    mModel.mEdgeList[i++].to = 3;
+    mModel.mEdgeList[i].from = 3;
+    mModel.mEdgeList[i++].to = 0;
+
+    mModel.mEdgeList[i].from = 7;
+    mModel.mEdgeList[i++].to = 4;
+    mModel.mEdgeList[i].from = 4;
+    mModel.mEdgeList[i++].to = 5;
+    mModel.mEdgeList[i].from = 5;
+    mModel.mEdgeList[i++].to = 6;
+    mModel.mEdgeList[i].from = 6;
+    mModel.mEdgeList[i++].to = 7;
+
+    mModel.mEdgeList[i].from = 11;
+    mModel.mEdgeList[i++].to = 8;
+    mModel.mEdgeList[i].from = 8;
+    mModel.mEdgeList[i++].to = 9;
+    mModel.mEdgeList[i].from = 9;
+    mModel.mEdgeList[i++].to = 10;
+    mModel.mEdgeList[i].from = 10;
+    mModel.mEdgeList[i++].to = 11;
+}
+
+void entityPlayer3::initPlayerForGame()
+{
+    player::initPlayerForGame();
+
+    if (theGame->numPlayers() > 1) {
+        mPos.x = (theGame->mGrid->extentX() / 2) - 9;
+        mPos.y = (theGame->mGrid->extentY() / 2) - 9;
+        mPos.z = 0;
+    }
+}
+
+void entityPlayer3::spawnTransition()
+{
+    player::spawnTransition();
+
+    mPos.x = (theGame->mGrid->extentX() / 2) - 9;
+    mPos.y = (theGame->mGrid->extentY() / 2) - 9;
+    mPos.z = 0;
+    mAngle = 0;
+}

@@ -1,0 +1,25 @@
+# Build output (Linux)
+opengw_sdl
+opengw_dvg
+obj_sdl/
+obj_dvg/
+*.o
+*.d
+
+# Build output (legacy)
+opengw
+obj/
+
+# Visual Studio
+.vs/
+x64/
+Debug/
+Release/
+*.vcxproj.user
+
+# Runtime
+scores.sav
+
+# OS
+.DS_Store
+Thumbs.db

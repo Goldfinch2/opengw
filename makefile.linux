@@ -1,0 +1,72 @@
+# OpenGW - Linux/Raspberry Pi Makefile
+#
+# Usage:
+#   make -f makefile.linux              # builds both opengw_sdl and opengw_dvg
+#   make -f makefile.linux sdl          # SDL/OpenGL renderer only
+#   make -f makefile.linux dvg          # DVG renderer only
+#   make -f makefile.linux clean
+
+CXX = g++
+
+CXXFLAGS_COMMON = -std=c++20 -Wall -Wextra -O3 -ggdb -I. -I/usr/local/include
+
+CXXFLAGS_SDL = $(CXXFLAGS_COMMON)
+CXXFLAGS_DVG = $(CXXFLAGS_COMMON) -DUSE_DVG_RENDERER
+
+LIBS_SDL = -lSDL3 -lGL -lGLU
+LIBS_DVG = -lSDL3
+
+ALL_SRC = $(wildcard *.cpp)
+SRC_FILES = $(notdir $(ALL_SRC))
+
+OBJDIR_SDL = obj_sdl
+OBJDIR_DVG = obj_dvg
+
+OBJS_SDL = $(patsubst %.cpp,$(OBJDIR_SDL)/%.o,$(SRC_FILES))
+OBJS_DVG = $(patsubst %.cpp,$(OBJDIR_DVG)/%.o,$(SRC_FILES))
+
+DEPS_SDL = $(OBJS_SDL:.o=.d)
+DEPS_DVG = $(OBJS_DVG:.o=.d)
+
+all: sdl dvg
+
+sdl: $(OBJDIR_SDL) opengw_sdl
+
+dvg: $(OBJDIR_DVG) opengw_dvg
+
+$(OBJDIR_SDL):
+	mkdir -p $(OBJDIR_SDL)
+
+$(OBJDIR_DVG):
+	mkdir -p $(OBJDIR_DVG)
+
+opengw_sdl: $(OBJS_SDL)
+	$(CXX) -o $@ $^ $(LIBS_SDL)
+
+opengw_dvg: $(OBJS_DVG)
+	$(CXX) -o $@ $^ $(LIBS_DVG)
+
+# SDL build
+$(OBJDIR_SDL)/%.d: %.cpp | $(OBJDIR_SDL)
+	$(CXX) -MM -MP -MT $(@:.d=.o) -o $@ $< $(CXXFLAGS_SDL)
+
+$(OBJDIR_SDL)/%.o: %.cpp
+	$(CXX) $(CXXFLAGS_SDL) -c $< -o $@
+
+# DVG build
+$(OBJDIR_DVG)/%.d: %.cpp | $(OBJDIR_DVG)
+	$(CXX) -MM -MP -MT $(@:.d=.o) -o $@ $< $(CXXFLAGS_DVG)
+
+$(OBJDIR_DVG)/%.o: %.cpp
+	$(CXX) $(CXXFLAGS_DVG) -c $< -o $@
+
+clean:
+	rm -rf $(OBJDIR_SDL) $(OBJDIR_DVG) opengw_sdl opengw_dvg
+
+.PHONY: all sdl dvg clean
+
+# Load .d files
+ifneq ($(MAKECMDGOALS),clean)
+-include $(DEPS_SDL)
+-include $(DEPS_DVG)
+endif

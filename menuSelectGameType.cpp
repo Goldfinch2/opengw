@@ -1,0 +1,419 @@
+#include "controls.hpp"
+#include "game.hpp"
+#include "grid.hpp"
+#include "menuSelectGameType.hpp"
+#include "players.hpp"
+
+#include "renderer.h"
+
+int menuSelectGameType::selection = 0;
+
+static bool debounceStart = false;
+
+static float player1Amount = 0;
+static float mpPlayer1Amount = 0;
+static float mpPlayer2Amount = 0;
+static float mpPlayer3Amount = 0;
+static float mpPlayer4Amount = 0;
+
+void menuSelectGameType::init(int player)
+{
+    debounceStart = true;
+    player1Amount = 0;
+    mpPlayer1Amount = 0;
+    mpPlayer2Amount = 0;
+    mpPlayer3Amount = 0;
+    mpPlayer4Amount = 0;
+
+    theGame->getPlayer1()->mJoined = player == 0 ? true : false;
+    theGame->getPlayer2()->mJoined = player == 1 ? true : false;
+    theGame->getPlayer3()->mJoined = player == 2 ? true : false;
+    theGame->getPlayer4()->mJoined = player == 3 ? true : false;
+
+    theGame->mSound->playTrack(SOUNDID_MENU_SELECT);
+}
+
+void menuSelectGameType::run()
+{
+    int dir = 0;
+
+    if (theGame->mControls->getBackButton(0) || theGame->mControls->getBackButton(1) || theGame->mControls->getBackButton(2) || theGame->mControls->getBackButton(3)) {
+        // Exit the menu
+        game::mGameMode = game::GAMEMODE_ATTRACT;
+        theGame->mSound->playTrack(SOUNDID_MENU_SELECT);
+        return;
+    }
+
+    if (!debounceStart) {
+        if (selection == 0) {
+            if (theGame->mControls->getStartButton(0) || theGame->mControls->getStartButton(1) || theGame->mControls->getStartButton(2) || theGame->mControls->getStartButton(3)) {
+                theGame->startGame(game::GAMETYPE_SINGLEPLAYER);
+                theGame->mSound->playTrack(SOUNDID_MENU_SELECT);
+            }
+        } else {
+            if (theGame->mControls->getStartButton(0))
+                theGame->getPlayer1()->mJoined = true;
+            if (theGame->mControls->getStartButton(1))
+                theGame->getPlayer2()->mJoined = true;
+            if (theGame->mControls->getStartButton(2))
+                theGame->getPlayer3()->mJoined = true;
+            if (theGame->mControls->getStartButton(3))
+                theGame->getPlayer4()->mJoined = true;
+
+            if (theGame->mControls->getTriggerButton(0) || theGame->mControls->getTriggerButton(1) || theGame->mControls->getTriggerButton(2) || theGame->mControls->getTriggerButton(3)) {
+                theGame->startGame(game::GAMETYPE_MULTIPLAYER_COOP);
+                theGame->mSound->playTrack(SOUNDID_MENU_SELECT);
+            }
+
+            /*
+                        if (theGame->mControls->getStartButton(0)
+                            || theGame->mControls->getStartButton(1)
+                            || theGame->mControls->getStartButton(2)
+                            || theGame->mControls->getStartButton(3))
+                        {
+                            //theGame->startGame(4, game::GAMETYPE_MULTIPLAYER_COOP);
+
+                            if (theGame->mControls->getStartButton(0))
+
+                        }
+            */
+
+            /*
+                    if (theGame->mControls->getStartButton(0))
+                    {
+                        theGame->startGame(1, game::GAMETYPE_SINGLEPLAYER);
+                    }
+                    else if (theGame->mControls->getStartButton(1))
+                    {
+                        theGame->startGame(2, game::GAMETYPE_MULTIPLAYER_COOP);
+                    }
+                    else if (theGame->mControls->getStartButton(2))
+                    {
+                        theGame->startGame(3, game::GAMETYPE_MULTIPLAYER_COOP);
+                    }
+                    else if (theGame->mControls->getStartButton(3))
+                    {
+                        theGame->startGame(4, game::GAMETYPE_MULTIPLAYER_COOP);
+                    }
+            */
+        }
+    } else {
+        if (!theGame->mControls->getStartButton(0) && !theGame->mControls->getStartButton(1) && !theGame->mControls->getStartButton(2) && !theGame->mControls->getStartButton(3)) {
+            debounceStart = false;
+        }
+    }
+
+    Point3d leftStick = theGame->mControls->getLeftStick(0) + theGame->mControls->getLeftStick(1) + theGame->mControls->getLeftStick(2) + theGame->mControls->getLeftStick(3);
+    float leftDistance = mathutils::calculate2dDistance(Point3d(0, 0, 0), leftStick);
+    if (leftDistance > .1) {
+        if (leftStick.x < -.5) {
+            dir = 1;
+        } else if (leftStick.x > .5) {
+            dir = -1;
+        }
+    }
+
+    Point3d rightStick = theGame->mControls->getRightStick(0) + theGame->mControls->getRightStick(1) + theGame->mControls->getRightStick(2) + theGame->mControls->getRightStick(3);
+    float rightDistance = mathutils::calculate2dDistance(Point3d(0, 0, 0), rightStick);
+    if (rightDistance > .1) {
+        if (rightStick.x < -.5) {
+            dir = 1;
+        } else if (rightStick.x > .5) {
+            dir = -1;
+        }
+    }
+
+    if (dir < 0) {
+        if (selection != 0) {
+            selection = 0;
+            theGame->mSound->playTrack(SOUNDID_MENU_SELECT);
+        }
+    } else if (dir > 0) {
+        if (selection != 1) {
+            selection = 1;
+            theGame->mSound->playTrack(SOUNDID_MENU_SELECT);
+        }
+    }
+
+    /*
+        if (dir > 0)
+        {
+            ++selection;
+            if (selection > 1)
+            {
+                selection = 1;
+            }
+        }
+        else if (dir < 0)
+        {
+            --selection;
+            if (selection < 0)
+            {
+                selection = 0;
+            }
+        }
+    */
+    const float amountIncrease = .02;
+    const float amountDampener = .97;
+
+    if (selection == 0) {
+        if (player1Amount < 1) {
+            player1Amount += amountIncrease;
+        } else if (player1Amount > 1) {
+            player1Amount *= amountDampener;
+        }
+
+        if (mpPlayer1Amount > 0)
+            mpPlayer1Amount *= amountDampener;
+        if (mpPlayer2Amount > 0)
+            mpPlayer2Amount *= amountDampener;
+        if (mpPlayer3Amount > 0)
+            mpPlayer3Amount *= amountDampener;
+        if (mpPlayer4Amount > 0)
+            mpPlayer4Amount *= amountDampener;
+    } else if (selection == 1) {
+        float player1Target = theGame->getPlayer1()->mJoined ? 1 : 0;
+        float player2Target = theGame->getPlayer2()->mJoined ? 1 : 0;
+        float player3Target = theGame->getPlayer3()->mJoined ? 1 : 0;
+        float player4Target = theGame->getPlayer4()->mJoined ? 1 : 0;
+
+        if (mpPlayer1Amount < player1Target) {
+            mpPlayer1Amount += amountIncrease;
+        } else if (mpPlayer1Amount > player1Target) {
+            mpPlayer1Amount *= amountDampener;
+        }
+
+        if (mpPlayer2Amount < player2Target) {
+            mpPlayer2Amount += amountIncrease;
+        } else if (mpPlayer2Amount > player2Target) {
+            mpPlayer2Amount *= amountDampener;
+        }
+
+        if (mpPlayer3Amount < player3Target) {
+            mpPlayer3Amount += amountIncrease;
+        } else if (mpPlayer3Amount > player3Target) {
+            mpPlayer3Amount *= amountDampener;
+        }
+
+        if (mpPlayer4Amount < player4Target) {
+            mpPlayer4Amount += amountIncrease;
+        } else if (mpPlayer4Amount > player4Target) {
+            mpPlayer4Amount *= amountDampener;
+        }
+
+        if (player1Amount > 0)
+            player1Amount *= amountDampener;
+    }
+
+    if (fabs(player1Amount) < amountIncrease)
+        player1Amount = 0;
+    if (fabs(mpPlayer1Amount) < amountIncrease)
+        mpPlayer1Amount = 0;
+    if (fabs(mpPlayer2Amount) < amountIncrease)
+        mpPlayer2Amount = 0;
+    if (fabs(mpPlayer3Amount) < amountIncrease)
+        mpPlayer3Amount = 0;
+    if (fabs(mpPlayer4Amount) < amountIncrease)
+        mpPlayer4Amount = 0;
+}
+
+void menuSelectGameType::draw()
+{
+    static float angle0 = 88, angle1 = 123, angle2 = 321, angle3 = 424, angle4 = 242;
+    angle0 += .052;
+    angle1 += .051;
+    angle2 += .049;
+    angle3 += .05;
+    angle4 += .052;
+
+    renderer::enableLineSmooth(true);
+
+    Point3d pos;
+    pos.x = theGame->mGrid->extentX() / 2;
+    pos.y = theGame->mGrid->extentY() / 2;
+    pos.z = 0;
+
+    renderer::setLineWidth(4);
+
+    // Single player
+
+    pos.x = (theGame->mGrid->extentX() / 2) + 0;
+    pos.y = (theGame->mGrid->extentY() / 2) + 16;
+
+    {
+        vector::pen pen = theGame->getPlayer1()->getPen();
+        pen.r = 1;
+        pen.g = 1;
+        pen.b = 1;
+        pen.a = .5;
+        const auto& model = theGame->getPlayer1()->getModel();
+        renderer::beginLines();
+        model->Identity();
+        model->Scale(4);
+        model->Rotate((sin(angle0) * .5) * player1Amount);
+        model->Translate(pos);
+        model->emit(pen);
+        renderer::endLines();
+    }
+
+    // Multiplayer
+
+    const float player1xPos = (theGame->mGrid->extentX() / 2) - 30;
+    const float player2xPos = (theGame->mGrid->extentX() / 2) - 10;
+    const float player3xPos = (theGame->mGrid->extentX() / 2) + 10;
+    const float player4xPos = (theGame->mGrid->extentX() / 2) + 30;
+
+    // PLAYER 1
+
+    pos.x = player1xPos;
+    pos.y = (theGame->mGrid->extentY() / 2) - 16;
+
+    {
+        vector::pen pen = vector::pen(1, .3, .3, 1, 12); // HACK - find a better way to get this color :-(
+        if (!theGame->getPlayer1()->mJoined)
+            pen.a *= .25;
+        const auto& model = theGame->getPlayer1()->getModel();
+        renderer::beginLines();
+        model->Identity();
+        model->Scale(4);
+        model->Rotate((sin(angle1) * .5) * mpPlayer1Amount);
+        model->Translate(pos);
+        model->emit(pen);
+        renderer::endLines();
+    }
+
+    // PLAYER 2
+
+    pos.x = player2xPos;
+    pos.y = (theGame->mGrid->extentY() / 2) - 16;
+
+    {
+        vector::pen pen = theGame->getPlayer2()->getPen();
+        if (!theGame->getPlayer2()->mJoined)
+            pen.a *= .25;
+        const auto& model = theGame->getPlayer2()->getModel();
+        renderer::beginLines();
+        model->Identity();
+        model->Scale(.25);
+        model->Rotate((sin(angle2) * .5) * mpPlayer2Amount);
+        model->Translate(pos);
+        model->emit(pen);
+        renderer::endLines();
+    }
+
+    // PLAYER 3
+
+    pos.x = player3xPos;
+    pos.y = (theGame->mGrid->extentY() / 2) - 16;
+
+    {
+        vector::pen pen = theGame->getPlayer3()->getPen();
+        if (!theGame->getPlayer3()->mJoined)
+            pen.a *= .25;
+        const auto& model = theGame->getPlayer3()->getModel();
+        renderer::beginLines();
+        model->Identity();
+        model->Scale(.25);
+        model->Rotate((sin(angle3) * .5) * mpPlayer3Amount);
+        model->Translate(pos);
+        model->emit(pen);
+        renderer::endLines();
+    }
+
+    // PLAYER 4
+
+    pos.x = player4xPos;
+    pos.y = (theGame->mGrid->extentY() / 2) - 16;
+
+    {
+        vector::pen pen = theGame->getPlayer4()->getPen();
+        if (!theGame->getPlayer4()->mJoined)
+            pen.a *= .25;
+        const auto& model = theGame->getPlayer4()->getModel();
+        renderer::beginLines();
+        model->Identity();
+        model->Scale(.25);
+        model->Rotate((sin(angle4) * .5) * mpPlayer4Amount);
+        model->Translate(pos);
+        model->emit(pen);
+        renderer::endLines();
+    }
+
+    // Single player selection rectangle
+    if (selection == 0) {
+        renderer::setColor(1, 1, 1, .5);
+        renderer::setLineWidth(4);
+
+        renderer::beginLineLoop();
+
+        Point3d p1((theGame->mGrid->extentX() / 2) - 10, (theGame->mGrid->extentY() / 2) + 25, 0);
+        Point3d p2((theGame->mGrid->extentX() / 2) + 10, (theGame->mGrid->extentY() / 2) + 25, 0);
+        Point3d p3((theGame->mGrid->extentX() / 2) + 10, (theGame->mGrid->extentY() / 2) + 7, 0);
+        Point3d p4((theGame->mGrid->extentX() / 2) - 10, (theGame->mGrid->extentY() / 2) + 7, 0);
+
+        renderer::lineLoopVertex(p1.x, p1.y);
+        renderer::lineLoopVertex(p2.x, p2.y);
+        renderer::lineLoopVertex(p3.x, p3.y);
+        renderer::lineLoopVertex(p4.x, p4.y);
+
+        renderer::endLineLoop();
+    }
+
+    // Multi player selection rectangle
+    if (selection == 1) {
+        renderer::setColor(1, 1, 1, 1);
+        renderer::setLineWidth(4);
+
+        renderer::beginLineLoop();
+
+        Point3d p1((theGame->mGrid->extentX() / 2) + 40, (theGame->mGrid->extentY() / 2) - 7, 0);
+        Point3d p2((theGame->mGrid->extentX() / 2) - 40, (theGame->mGrid->extentY() / 2) - 7, 0);
+        Point3d p3((theGame->mGrid->extentX() / 2) - 40, (theGame->mGrid->extentY() / 2) - 25, 0);
+
+        const float indicatorW = 3;
+        const float indicatorH = 1.5;
+
+        // Player 1 indicator
+        Point3d p4(player1xPos - (indicatorW / 2), ((theGame->mGrid->extentY() / 2) - 25), 0);
+        Point3d p5(player1xPos, ((theGame->mGrid->extentY() / 2) - 25) + ((theGame->getPlayer1()->mJoined) ? indicatorH : 0), 0);
+        Point3d p6(player1xPos + (indicatorW / 2), ((theGame->mGrid->extentY() / 2) - 25), 0);
+
+        // Player 2 indicator
+        Point3d p7(player2xPos - (indicatorW / 2), ((theGame->mGrid->extentY() / 2) - 25), 0);
+        Point3d p8(player2xPos, ((theGame->mGrid->extentY() / 2) - 25) + ((theGame->getPlayer2()->mJoined) ? indicatorH : 0), 0);
+        Point3d p9(player2xPos + (indicatorW / 2), ((theGame->mGrid->extentY() / 2) - 25), 0);
+
+        // Player 3 indicator
+        Point3d p10(player3xPos - (indicatorW / 2), ((theGame->mGrid->extentY() / 2) - 25), 0);
+        Point3d p11(player3xPos, ((theGame->mGrid->extentY() / 2) - 25) + ((theGame->getPlayer3()->mJoined) ? indicatorH : 0), 0);
+        Point3d p12(player3xPos + (indicatorW / 2), ((theGame->mGrid->extentY() / 2) - 25), 0);
+
+        // Player 4 indicator
+        Point3d p13(player4xPos - (indicatorW / 2), ((theGame->mGrid->extentY() / 2) - 25), 0);
+        Point3d p14(player4xPos, ((theGame->mGrid->extentY() / 2) - 25) + ((theGame->getPlayer4()->mJoined) ? indicatorH : 0), 0);
+        Point3d p15(player4xPos + (indicatorW / 2), ((theGame->mGrid->extentY() / 2) - 25), 0);
+
+        Point3d p16((theGame->mGrid->extentX() / 2) + 40, (theGame->mGrid->extentY() / 2) - 25, 0);
+
+        renderer::lineLoopVertex(p1.x, p1.y);
+        renderer::lineLoopVertex(p2.x, p2.y);
+        renderer::lineLoopVertex(p3.x, p3.y);
+        renderer::lineLoopVertex(p4.x, p4.y);
+        renderer::lineLoopVertex(p5.x, p5.y);
+        renderer::lineLoopVertex(p6.x, p6.y);
+        renderer::lineLoopVertex(p7.x, p7.y);
+        renderer::lineLoopVertex(p8.x, p8.y);
+        renderer::lineLoopVertex(p9.x, p9.y);
+        renderer::lineLoopVertex(p10.x, p10.y);
+        renderer::lineLoopVertex(p11.x, p11.y);
+        renderer::lineLoopVertex(p12.x, p12.y);
+        renderer::lineLoopVertex(p13.x, p13.y);
+        renderer::lineLoopVertex(p14.x, p14.y);
+        renderer::lineLoopVertex(p15.x, p15.y);
+        renderer::lineLoopVertex(p16.x, p16.y);
+
+        renderer::endLineLoop();
+    }
+
+    renderer::enableLineSmooth(false);
+}

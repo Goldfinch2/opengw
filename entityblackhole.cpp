@@ -1,0 +1,640 @@
+#include "attractor.hpp"
+#include "defines.hpp"
+#include "entityblackhole.hpp"
+#include "enemies.hpp"
+#include "game.hpp"
+#include "grid.hpp"
+#include "particle.hpp"
+#include "players.hpp"
+#include "scene.hpp"
+#include "settings.hpp"
+#include "sincos.hpp"
+
+#include "renderer.h"
+
+entityBlackHole::entityBlackHole(const game& gameRef) : mGame(gameRef)
+{
+    mScale = 1.5;
+    mRadius = 2.5;
+
+    mEdgeBounce = true;
+
+    mScoreValue = 50;
+
+    mPen = vector::pen(1, .5, .5, .7, 4);
+
+    mType = ENTITY_TYPE_BLACKHOLE;
+    setState(ENTITY_STATE_INACTIVE);
+
+    mActivated = false;
+    mDestroyTime = 0;
+    mAnimationIndex = 0;
+    mAnimationSpeed = 0;
+    mAnimationDepth = 0;
+    mAttractorStrengthIndex = 0;
+    mStrength = 1;
+    mBalance = 0;
+    mBalanceRate = 0;
+
+    mGridPullIndex = mathutils::frandFrom0To1();
+
+    mHumLoopSoundId = -1;
+
+    // This entity doesn't use a model
+}
+
+void entityBlackHole::runTransition()
+{
+    entity::runTransition();
+}
+
+void entityBlackHole::run()
+{
+    if (mActivated) {
+        mAnimationSpeed = mStrength * .5;
+    } else {
+        mAnimationSpeed = .5;
+    }
+    mAnimationDepth = /*mStrength **/ .2;
+
+    mSpeed = mathutils::clamp2dVector(mSpeed, .2);
+    mSpeed *= .96;
+
+    mDrift = mathutils::clamp2dVector(mDrift, .8);
+
+    mHumSpeedTarget = (mStrength * mStrength) / 2;
+    if (mHumSpeed < mHumSpeedTarget)
+        mHumSpeed += .01;
+    else if (mHumSpeed > mHumSpeedTarget)
+        mHumSpeed -= .01;
+
+    if (mActivated) {
+        mStrength += .0003;
+
+        if (mHumLoopSoundId == -1)
+            mHumLoopSoundId = theGame->mSound->playTrackGroup(SOUNDID_GRAVITYWELL_HUMLOOPA, SOUNDID_GRAVITYWELL_HUMLOOPF);
+        if (mHumLoopSoundId != -1)
+            theGame->mSound->setTrackSpeed(mHumLoopSoundId, mHumSpeed + .2);
+
+        if (mStrength > 2.2) {
+            if (!theGame->mSound->isTrackPlaying(SOUNDID_GRAVITYWELLALERT))
+                theGame->mSound->playTrack(SOUNDID_GRAVITYWELLALERT);
+        }
+        if (mStrength > 2.3) {
+            // Explode and spawn a bunch of protons
+            setState(ENTITY_STATE_DESTROY_TRANSITION);
+            theGame->mSound->playTrack(SOUNDID_GRAVITYWELLEXPLODE);
+
+            for (int i = 0; i < 20; i++) {
+                entity* enemy = theGame->mEnemies->getUnusedEnemyOfType(entity::ENTITY_TYPE_PROTON);
+                if (enemy) {
+                    const float distance = mathutils::frandFrom0To1() * 10;
+                    float angle = mathutils::frandFrom0To1() * (2 * PI);
+                    Point3d spawnPoint(distance, 0, 0);
+                    spawnPoint = mathutils::rotate2dPoint(spawnPoint, angle);
+
+                    enemy->setDrift(Point3d(spawnPoint.x * 100, spawnPoint.y * 100, 0));
+                    enemy->setPos(spawnPoint + mPos);
+                    enemy->setState(entity::ENTITY_STATE_SPAWN_TRANSITION);
+                }
+            }
+
+            return;
+        }
+
+        if (mBalance > 0)
+            mBalanceRate -= .01;
+        else if (mBalance < 0)
+            mBalanceRate += .01;
+
+        mBalanceRate *= .95;
+        mBalance += mBalanceRate;
+        mBalance *= .95;
+
+        // Distort the grid
+
+        attractor::Attractor* att = theGame->mAttractors->getAttractor();
+        if (att) {
+            float s = sin(mGridPullIndex);
+
+            if (fabs(s) > .7) {
+                mGridPullIndex += 0.2f;
+            } else {
+                mGridPullIndex += 0.04f;
+            }
+
+            if (s > 0)
+                s *= .5;
+            s = ((s + 1) / 2) + .5;
+
+            att->strength = s * -30;
+
+            att->radius = 6;
+
+            att->pos = mPos;
+            att->enabled = true;
+            att->attractsParticles = true;
+        }
+    }
+
+    // Seek the player
+
+    float angle = mathutils::calculate2dAngle(mPos, mGame.mPlayers->getPlayerClosestToPosition(mPos)->getPos());
+    Point3d moveVector(1, 0, 0);
+    moveVector = mathutils::rotate2dPoint(moveVector, angle);
+    mSpeed += moveVector * .002;
+
+    mSpeed *= .98;
+
+    mAnimationIndex += mAnimationSpeed;
+
+    entity::run();
+
+    // Keep it on the grid
+
+    const float leftEdge = getRadius();
+    const float bottomEdge = getRadius();
+    const float rightEdge = (mGame.mGrid->extentX() - getRadius()) - 1;
+    const float topEdge = (mGame.mGrid->extentY() - getRadius()) - 1;
+
+    if (mPos.x < leftEdge) {
+        mPos.x = leftEdge;
+        mSpeed.x = -mSpeed.x;
+    } else if (mPos.x > rightEdge) {
+        mPos.x = rightEdge;
+        mSpeed.x = -mSpeed.x;
+    }
+    if (mPos.y < bottomEdge) {
+        mPos.y = bottomEdge;
+        mSpeed.y = -mSpeed.y;
+    } else if (mPos.y > topEdge) {
+        mPos.y = topEdge;
+        mSpeed.y = -mSpeed.y;
+    }
+
+    if (mActivated) {
+        float delta_theta = .1;
+        for (float a = 0; a < 2 * PI; a += delta_theta) {
+            if (mathutils::frandFrom0To1() > .99) {
+                float r = mRadius * 8 * mathutils::frandFrom0To1();
+                Point3d pos = Point3d(r * get_cos(a), r * get_sin(a), 0);
+                pos += mPos;
+
+                Point3d direction(0, 1, 0);
+                mathutils::rotate2dPoint(direction, mathutils::frandFrom0To1() * 2 * PI);
+                float speed = 0.1;
+                float spread = 2 * PI;
+                int num = 1;
+                int timeToLive = mathutils::frandFrom0To1() * 300;
+
+                vector::pen pen;
+                pen.r = mathutils::frandFrom0To1();
+                pen.g = mathutils::frandFrom0To1();
+                pen.b = mathutils::frandFrom0To1();
+                pen.a = 100;
+
+                pen.lineRadius = 5;
+                theGame->mParticles->emitter(&pos, &direction, speed, spread, num, &pen, timeToLive, true, true, .95);
+            }
+        }
+        /*
+
+                for (int i=0; i<20; i++)
+                {
+                    Point3d pos(this->mPos);
+                    Point3d angle(0,0,0);
+                    float speed = ((float)i/200) * 5;
+                    float spread = 2*PI;
+                    int num = 1;
+                    int timeToLive = mathutils::frandFrom0To1() * 300;
+                    vector::pen pen = mPen;
+                    pen.lineRadius=5;
+                    theGame->mParticles->emitter(&pos, &angle, speed, spread, num, &pen, timeToLive);
+                }
+        */
+    }
+}
+
+void entityBlackHole::spawnTransition()
+{
+    entity::spawnTransition();
+
+    mActivated = false;
+    mRadius = 2.5;
+    mStrength = 1.5;
+    mBalance = 0;
+    mBalanceRate = 0;
+    mFeedCount = 0;
+
+    mDestroyTime = 0;
+    mAnimationIndex = 0;
+    mAnimationSpeed = 0;
+    mAnimationDepth = 0;
+    mAttractorStrengthIndex = 0;
+    mBalance = 0;
+
+    mPoints = 150;
+
+    mHumSpeed = (mStrength * mStrength) / 2;
+    mHumSpeedTarget = mHumSpeed;
+    mHumLoopSoundId = -1;
+
+    theGame->mSound->playTrack(SOUNDID_ENEMYSPAWN5);
+}
+
+void entityBlackHole::destroyTransition()
+{
+    // Here we actually get destroyed
+    entity::destroyTransition();
+
+    if (mHumLoopSoundId != -1)
+        theGame->mSound->stopTrack(mHumLoopSoundId);
+    mHumLoopSoundId = -1;
+
+    // Throw out some particles
+    for (int i = 0; i < 100; i++) {
+        Point3d pos(this->mPos);
+        Point3d angle(0, 0, 0);
+        float speed = ((float)i / 200) * 1000;
+        float spread = 2 * PI;
+        int num = 1;
+        int timeToLive = mathutils::frandFrom0To1() * 300;
+        vector::pen pen = mPen;
+        pen.lineRadius = 5;
+        theGame->mParticles->emitter(&pos, &angle, speed, spread, num, &pen, timeToLive);
+    }
+
+    attractor::Attractor* att = theGame->mAttractors->getAttractor();
+    if (att) {
+        att->strength = 100;
+        att->radius = 50;
+        att->pos = mPos;
+        att->enabled = true;
+        att->attractsParticles = false;
+    }
+}
+
+void entityBlackHole::indicateTransition()
+{
+    entity::indicateTransition();
+
+    if (mHumLoopSoundId != -1)
+        theGame->mSound->stopTrack(mHumLoopSoundId);
+    mHumLoopSoundId = -1;
+}
+
+void entityBlackHole::hit(entity* aEntity)
+{
+    theGame->mSound->playTrack(SOUNDID_GRAVITYWELLHIT);
+
+    entityPlayerMissile* missile = dynamic_cast<entityPlayerMissile*>(aEntity);
+    if (missile) {
+        if (mActivated) {
+            mStrength *= .98;
+
+            if (mStrength < .7) {
+                // Destroy
+                setState(ENTITY_STATE_DESTROY_TRANSITION);
+                theGame->mSound->playTrack(SOUNDID_GRAVITYWELLDESTROYED);
+
+                entityPlayerMissile* missile = dynamic_cast<entityPlayerMissile*>(aEntity);
+                if (missile) {
+                    if (mPoints) {
+                        Point3d pos = getPos();
+
+                        // Add points and display them at the destruction point
+                        if (missile->mPlayerSource == 0)
+                            mGame.getPlayer1()->addKillAtLocation(mPoints, pos);
+                        else if (missile->mPlayerSource == 1)
+                            mGame.getPlayer2()->addKillAtLocation(mPoints, pos);
+                    }
+                }
+            }
+        } else {
+            mActivated = true;
+
+            if (mGame.mGameMode == game::GAMEMODE_PLAYING) {
+                if (mHumLoopSoundId == -1)
+                    mHumLoopSoundId = theGame->mSound->playTrackGroup(SOUNDID_GRAVITYWELL_HUMLOOPA, SOUNDID_GRAVITYWELL_HUMLOOPF);
+            }
+
+            mBalance = 1.6;
+            mBalanceRate = 0;
+
+            /*
+                        // Distrupt the grid at the activation point
+                        attractor::Attractor* att = theGame->mAttractors->getAttractor();
+                        if (att)
+                        {
+                            att->strength = 20;
+                            att->radius = 20;
+                            att->pos = mPos;
+                            att->enabled = true;
+                            att->attractsParticles = FALSE;
+                        }
+            */
+        }
+
+        float r;
+        if (mActivated) {
+            r = mRadius + (get_sin(mAnimationIndex) * mAnimationDepth);
+            r *= mStrength + (mBalance * .1);
+        } else {
+            r = mRadius;
+        }
+
+        /*
+                {
+                    Point3d angle(0, 0, 0);
+                    float speed = 2;
+                    float spread = (2*PI);
+                    int num = mathutils::frandFrom0To1() * 30;
+                    int timeToLive = 500;
+                    vector::pen pen = mPen;
+                    pen.r = mathutils::frandFrom0To1();
+                    pen.g = mathutils::frandFrom0To1();
+                    pen.b = mathutils::frandFrom0To1();
+                    pen.a = .4;
+                    pen.lineRadius=5;
+                    theGame->mParticles->emitter(&mPos, &angle, speed, spread, num, &pen, timeToLive, true, true, .92, true);
+                }
+        */
+        for (int i = 0; i < 360; i++) {
+            if (mathutils::frandFrom0To1() * 100 < 10) {
+                float ang = mathutils::DegreesToRads(i);
+                Point3d pos = Point3d(0, r + 1, 0);
+                pos = mathutils::rotate2dPoint(pos, ang);
+                pos += mPos;
+                Point3d angle(0, ang, 0);
+
+                float speed = 30;
+                float spread = 0;
+                int num = 1;
+                int timeToLive = mathutils::frandFrom0To1() * 200;
+                vector::pen pen = mPen;
+                pen.r = 1; // mathutils::frandFrom0To1() + .5;
+                pen.g = 1; // mathutils::frandFrom0To1() + .5;
+                pen.b = 1; // mathutils::frandFrom0To1() + .5;
+                pen.a = .5;
+                pen.lineRadius = 5;
+                theGame->mParticles->emitter(&pos, &angle, speed, spread, num, &pen, timeToLive, false, true, .95);
+            }
+        }
+
+        mBalance -= .2;
+    } else if (aEntity && aEntity->getType() == entity::ENTITY_TYPE_BLACKHOLE) {
+        // This code can probably go away
+        // This code can probably go away
+        // This code can probably go away
+
+        mActivated = true;
+
+        mBalance = 2;
+        mBalanceRate = 0;
+
+        // Distrupt the grid at the activation point
+        attractor::Attractor* att = theGame->mAttractors->getAttractor();
+        if (att) {
+            att->strength = 20;
+            att->radius = 20;
+            att->pos = mPos;
+            att->enabled = true;
+            att->attractsParticles = false;
+        }
+
+        // This code can probably go away
+        // This code can probably go away
+        // This code can probably go away
+    } else {
+        // It must be a bomb
+        this->destroyTransition();
+    }
+}
+
+entity* entityBlackHole::hitTest(const Point3d& pos, float radius)
+{
+    float distance = mathutils::calculate2dDistance(pos, mPos);
+    float resultRadius = radius + getRadius();
+    if (distance < resultRadius) {
+        return this;
+    }
+    return nullptr;
+}
+
+void entityBlackHole::draw()
+{
+    if (this->getState() == entity::ENTITY_STATE_INDICATING) {
+        if (((int)(mStateTimer / 10)) & 1) {
+        } else
+            return;
+    }
+
+    if (this->getEnabled()) {
+        if (getState() == ENTITY_STATE_SPAWNING) {
+            vector::pen pen = mPen;
+            float radius = mRadius;
+
+            float inc = 1.0f / mSpawnTime;
+            float progress = mStateTimer * inc;
+
+            // *********************************************
+
+            progress = 1 - progress;
+
+            float a = progress;
+            if (a < 0)
+                a = 0;
+            if (a > 1)
+                a = 1;
+
+            mPen.a = a;
+
+            mRadius = radius * progress * 1;
+            drawRing();
+
+            // *********************************************
+
+            progress = progress + .25;
+
+            a = 1 - progress;
+            if (a < 0)
+                a = 0;
+            if (a > 1)
+                a = 1;
+
+            mPen.a = a;
+
+            mRadius = radius * progress * 4;
+            drawRing();
+
+            // *********************************************
+
+            progress = progress + .25;
+
+            a = 1 - progress;
+            if (a < 0)
+                a = 0;
+            if (a > 1)
+                a = 1;
+
+            mPen.a = a;
+
+            mRadius = radius * progress * 7;
+            drawRing();
+
+            // *********************************************
+
+            // Restore stuff
+            mRadius = radius;
+            mPen = pen;
+        }
+
+        drawRing();
+    }
+}
+
+void entityBlackHole::drawRing()
+{
+    bool activated = (this->getState() == entity::ENTITY_STATE_INDICATING) ? false : mActivated;
+
+    float delta_theta = 0.05;
+
+    float r;
+    if (activated) {
+        r = mRadius + (get_sin(mAnimationIndex) * mAnimationDepth);
+        r *= mStrength + (mBalance * .1);
+    } else {
+        r = mRadius;
+    }
+
+    // Enable if you want the black holes to appear as "holes" in the grid
+#if 0
+    if (activated && (mState != entity::ENTITY_STATE_SPAWNING) && (scene::mPass != scene::RENDERPASS_PRIMARY))
+    {
+        glDisable(GL_BLEND);
+
+        glColor4f(1, .5, .5, 1);
+
+        glBegin(GL_TRIANGLE_FAN);
+
+        glVertex3f( mPos.x, mPos.y, 0 );
+
+        float c = r*1.5;
+
+        for (float angle = 0; angle < 2.01*PI; angle += delta_theta )
+            glVertex3f( mPos.x + (c*get_cos(angle)), mPos.y + (c*get_sin(angle)), 0 );
+
+        glEnd();
+
+	    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+    }
+
+    if (activated && (mState != entity::ENTITY_STATE_SPAWNING))
+    {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA);
+
+        glColor4f(0, 0, 0, 1);
+
+        glBegin(GL_TRIANGLE_FAN);
+
+        glVertex3f( mPos.x, mPos.y, 0 );
+
+        float c = r;
+
+        for (float angle = 0; angle < 2.01*PI; angle += delta_theta )
+            glVertex3f( mPos.x + (c*get_cos(angle)), mPos.y + (c*get_sin(angle)), 0 );
+
+        glEnd();
+
+	    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+    }
+#endif
+
+    if ((mState != entity::ENTITY_STATE_SPAWNING) && (scene::mPass != scene::RENDERPASS_PRIMARY)) {
+        renderer::disableBlend();
+        renderer::setBlendAdditive();
+
+        renderer::setColor(.3, .05, .05, 1);
+        renderer::setLineWidth(6);
+
+        renderer::beginLineLoop();
+
+        float c = r + .2;
+
+        for (float angle = 0; angle < 2 * PI; angle += delta_theta)
+            renderer::lineLoopVertex(mPos.x + (c * get_cos(angle)), mPos.y + (c * get_sin(angle)));
+
+        renderer::endLineLoop();
+
+        renderer::beginLineLoop();
+
+        c = r;
+
+        for (float angle = 0; angle < 2 * PI; angle += delta_theta)
+            renderer::lineLoopVertex(mPos.x + (c * get_cos(angle)), mPos.y + (c * get_sin(angle)));
+
+        renderer::endLineLoop();
+
+        renderer::enableBlend();
+        renderer::setBlendAdditive();
+    }
+
+    float c = (get_sin(mAnimationIndex) * mAnimationDepth);
+
+    if (activated) {
+        if (scene::mPass == scene::RENDERPASS_PRIMARY) {
+            renderer::setColor(1, 1, 1, 1);
+        } else {
+            renderer::setColor(mPen.r, .25, .25, 1);
+        }
+    } else if (mState != entity::ENTITY_STATE_SPAWNING) {
+        if (scene::mPass == scene::RENDERPASS_PRIMARY) {
+            renderer::setColor(mPen.r, mPen.g, mPen.b, (mPen.a * c) + .5);
+        } else {
+            renderer::setColor(mPen.r, .25, .25, 1);
+        }
+    } else {
+        renderer::setColor(mPen.r, mPen.g, mPen.b, mPen.a);
+    }
+
+    renderer::setLineWidth(mPen.lineRadius);
+
+    if (!settings::get().mEnemySmoothing) {
+        renderer::enableLineSmooth(true);
+    }
+
+    renderer::beginLineLoop();
+
+    for (float angle = 0; angle < 2 * PI; angle += delta_theta) {
+        renderer::lineLoopVertex(mPos.x + (r * get_cos(angle)), mPos.y + (r * get_sin(angle)));
+    }
+
+    renderer::endLineLoop();
+
+    if (!settings::get().mEnemySmoothing) {
+        renderer::enableLineSmooth(false);
+    }
+}
+
+void entityBlackHole::feed(int points)
+{
+    mPoints += points * 2;
+    mStrength += .06;
+    mBalanceRate += .14;
+    ++mFeedCount;
+}
+
+float entityBlackHole::getRadius() const
+{
+    float r;
+    if (mActivated) {
+        r = mRadius + (get_sin(mAnimationIndex) * mAnimationDepth);
+        r *= mStrength + (mBalance * .1);
+        r *= 2;
+    } else {
+        r = mRadius;
+    }
+
+    return r;
+}

@@ -1,0 +1,43 @@
+# NOTE: this makefile hasn't been tested recently
+LIBS = -LC:\SDK\lib -lmingw32 -lSDL3 -lopengl32 -lglu32
+OWN_PATHS = -I.
+HEADERS = -mwindows $(OWN_PATHS) -IC:\SDK\include
+DEFINES =
+CFLAGS = -std=c++20 -Wall -Wextra -O3 -ggdb
+NAME = opengw.exe
+OBJDIR = obj
+
+#VPATH = src:src/renderer:src/common
+
+ALL_SRC = $(wildcard *.cpp)
+SRC_FILES = $(notdir $(ALL_SRC))
+OBJ_FILES = $(SRC_FILES:.cpp=.o)
+
+OBJS = $(addprefix $(OBJDIR)/, $(OBJ_FILES))
+DEPS = $(OBJS:.o=.d)
+COMPILER = g++
+
+all: $(NAME)
+	$(NAME)
+
+# dependencies
+$(OBJDIR)/%.d : %.cpp | $(OBJDIR)
+	$(COMPILER) -MM -MP -MT $(@:.d=.o) -o $@ $< $(CFLAGS) $(DEFINES) $(HEADERS)
+
+# compiling
+$(OBJDIR)/%.o : %.cpp
+	$(COMPILER) -o $@ -c $< $(CFLAGS) $(DEFINES) $(HEADERS)
+
+clean:
+	rm $(OBJDIR)/*
+
+$(NAME): $(OBJS)
+	$(COMPILER) -o $@ $(OBJS) $(LIBS)
+
+$(OBJDIR):
+	mkdir -p $@
+
+# Load .d files
+ifneq ($(MAKECMDGOALS),clean)
+-include $(DEPS)
+endif

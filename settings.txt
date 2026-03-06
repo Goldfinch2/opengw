@@ -1,0 +1,32 @@
+# OpenGW Settings
+# Lines starting with # are comments
+# Use [sdl] and [dvg] sections for build-specific settings
+
+# Display
+display_width 800
+display_height 600
+
+# Gameplay
+credits_per_game false
+
+[sdl]
+target_fps 60
+enable_glow false
+grid_smoothing false
+particle_smoothing false
+enemy_smoothing false
+player_smoothing true
+star_smoothing true
+attractors 50
+particles 3000
+grid_passes 4
+grid_spacing 4
+
+[dvg]
+dvg_refresh_rate 40
+serial_port /dev/ttyACM0
+sort_vectors true
+attractors 50
+particles 100
+grid_passes 4
+grid_spacing 20

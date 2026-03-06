@@ -1,0 +1,53 @@
+#include "entityline.hpp"
+#include "game.hpp"
+
+entityLine::entityLine(void)
+{
+    mScale = 1;
+    mRadius = 1;
+
+    mEdgeBounce = true;
+    mGridBound = true;
+
+    mTimeToLive = 0;
+    mSpawnTime = 0;
+    mDestroyTime = 0;
+
+    mType = ENTITY_TYPE_LINE;
+    setState(ENTITY_STATE_INACTIVE);
+
+    mModel.mVertexList.resize(2);
+    mModel.mVertexList[0] = Point3d(0, 0);
+    mModel.mVertexList[1] = Point3d(0, 0);
+
+    mModel.mEdgeList.resize(1);
+    mModel.mEdgeList[0].from = 0;
+    mModel.mEdgeList[0].to = 1;
+}
+
+void entityLine::spawnTransition()
+{
+    this->setState(entity::ENTITY_STATE_RUNNING);
+    mTimeToLive = 100;
+    run();
+}
+
+void entityLine::run()
+{
+    mPen.a *= .9;
+
+    if (--mTimeToLive <= 0) {
+        mTimeToLive = 0;
+        this->setState(entity::ENTITY_STATE_DESTROYED);
+    }
+
+    mSpeed *= .985;
+
+    entity::run();
+}
+
+void entityLine::addEndpoints(const Point3d& from, const Point3d& to)
+{
+    mModel.mVertexList[0] = Point3d(from);
+    mModel.mVertexList[1] = Point3d(to);
+}
