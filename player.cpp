@@ -809,54 +809,34 @@ void player::addKillAtLocation(int points, Point3d pos)
 
 int player::getNumLives()
 {
-    if (theGame->numPlayers() == 1)
-        return mNumLives;
-    else
-        return game::m2PlayerNumLives;
+    return mNumLives;
 }
 
 int player::getNumBombs()
 {
-    if (theGame->numPlayers() == 1)
-        return mNumBombs;
-    else
-        return game::m2PlayerNumBombs;
+    return mNumBombs;
 }
 
 void player::addLife()
 {
-    if (theGame->numPlayers() == 1)
-        ++mNumLives;
-    else
-        ++game::m2PlayerNumLives;
+    ++mNumLives;
 }
 
 void player::takeLife()
 {
-    if (theGame->numPlayers() == 1)
-        --mNumLives;
-    else
-        --game::m2PlayerNumLives;
-
+    --mNumLives;
     if (mNumLives < 0)
         mNumLives = 0;
-
-    if (game::m2PlayerNumLives < 0)
-        game::m2PlayerNumLives = 0;
 }
 
 void player::addBomb()
 {
-    if (theGame->numPlayers() == 1)
-        ++mNumBombs;
-    // No bombs on 2 player game
+    ++mNumBombs;
 }
 
 void player::takeBomb()
 {
-    if (theGame->numPlayers() == 1)
-        --mNumBombs;
-    // No bombs on 2 player game
+    --mNumBombs;
 }
 
 void player::addPointsNoMultiplier(int points)

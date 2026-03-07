@@ -95,6 +95,11 @@ void translate(float x, float y, float z)
     glTranslatef(x, y, z);
 }
 
+void setScreenSpace(bool /*enabled*/)
+{
+    // GL build uses glEnable2D/glDisable2D for 2D mode
+}
+
 // Lines
 void beginLines()
 {

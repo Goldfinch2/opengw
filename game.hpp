@@ -91,7 +91,6 @@ class game
     {
         GAMEMODE_ATTRACT = 0,
         GAMEMODE_CREDITED,
-        GAMEMODE_CHOOSE_GAMETYPE,
         GAMEMODE_PLAYING,
         GAMEMODE_HIGHSCORES_CHECK,
         GAMEMODE_HIGHSCORES,
@@ -102,8 +101,6 @@ class game
     typedef enum
     {
         GAMETYPE_SINGLEPLAYER = 0,
-        GAMETYPE_MULTIPLAYER_COOP,
-        GAMETYPE_MULTIPLAYER_VS
     } GameType;
 
     game();
@@ -123,9 +120,6 @@ class game
     int numPlayers() const;
 
     player* getPlayer1() const;
-    player* getPlayer2() const;
-    player* getPlayer3() const;
-    player* getPlayer4() const;
 
     std::unique_ptr<sound> mSound;
     std::unique_ptr<grid> mGrid;
@@ -152,8 +146,6 @@ class game
     static int mCredits;
     static int mLevel;
 
-    static int m2PlayerNumLives;
-    static int m2PlayerNumBombs;
 
   private:
     typedef struct

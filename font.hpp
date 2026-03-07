@@ -31,6 +31,6 @@ void AlphanumericsSetAngle(float topAscent, float bottomAscent);
 
 char* formatStringWithCommas(char* string);
 
-//    extern float AlphanumericsPrintVScale;
+extern float AlphanumericsPrintScale;
 
 } // namespace font

@@ -58,40 +58,17 @@ void entityPlayer1::initPlayerForGame()
 {
     player::initPlayerForGame();
 
-    if ((mGame.numPlayers() == 1) || (mGame.mGameMode != game::GAMEMODE_PLAYING)) {
-        mPen = vector::pen(1, 1, 1, 1, 12);
-        mExhaustPen = vector::pen(.9, 1, .35, 1, 5);
-        mMissilesPen = vector::pen(.9, 1, .35, 1, 5);
-        mFontPen = vector::pen(1, 1, 0, 1, 5);
+    mPen = vector::pen(1, 1, 1, 1, 12);
+    mExhaustPen = vector::pen(.9, 1, .35, 1, 5);
+    mMissilesPen = vector::pen(.9, 1, .35, 1, 5);
+    mFontPen = vector::pen(1, 1, 0, 1, 5);
 
-        mPos.x = mGame.mGrid->extentX() / 2;
-        mPos.y = mGame.mGrid->extentY() / 2;
-        mPos.z = 0;
-    } else {
-        mPen = vector::pen(1, .4, .4, 1, 12);
-        mExhaustPen = vector::pen(1, .4, .4, 1, 5);
-        mMissilesPen = vector::pen(1, .4, .4, 1, 5);
-        mFontPen = vector::pen(1, .4, .4, 1, 5);
-
-        mPos.x = (theGame->mGrid->extentX() / 2) - 9;
-        mPos.y = (theGame->mGrid->extentY() / 2) + 9;
-        mPos.z = 0;
-    }
+    mPos.x = mGame.mGrid->extentX() / 2;
+    mPos.y = mGame.mGrid->extentY() / 2;
+    mPos.z = 0;
 }
 
 void entityPlayer1::spawnTransition()
 {
     player::spawnTransition();
-
-    if (theGame->numPlayers() > 1) {
-        mPen = vector::pen(1, .4, .4, 1, 12);
-        mExhaustPen = vector::pen(1, .4, .4, 1, 5);
-        mMissilesPen = vector::pen(1, .4, .4, 1, 5);
-        mFontPen = vector::pen(1, .4, .4, 40, 5);
-
-        mPos.x = (mGame.mGrid->extentX() / 2) - 9;
-        mPos.y = (mGame.mGrid->extentY() / 2) + 9;
-        mPos.z = 0;
-        mAngle = 0;
-    }
 }

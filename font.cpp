@@ -6,8 +6,6 @@
 
 #include "renderer.h"
 
-float AlphanumericsPrintVScale = 1.0f;
-
 static float cursorX = 0, cursorY = 0;
 static const float xcell = 1.9;
 static const float ycell = 3.5;
@@ -20,6 +18,10 @@ static float _bottomAscentOffset = 0;
 
 namespace font
 {
+
+float AlphanumericsPrintVScale = 1.0f;
+float AlphanumericsPrintScale = 1.0f;
+
 static inline void drawText(float scale, Point3d* p, vector::pen* color, bool lower = false);
 
 static Point3d charA[] = {
@@ -778,9 +780,9 @@ static Point3d charUnderscore[] = {
 void AlphanumericsMeasureString(const char* string, float scale, float* width, float* height)
 {
     if (width) {
-        *width = strlen(string) * scale * xcell;
+        *width = strlen(string) * scale * AlphanumericsPrintScale * xcell;
         if (height)
-            *height = scale * ycell;
+            *height = scale * AlphanumericsPrintScale * ycell;
     } else {
         if (height)
             *height = scale * ycell;
@@ -850,9 +852,9 @@ void AlphanumericsPrint(int alignment, float scale, float x, float y, vector::pe
         cursorX = x;
     }
     if (alignment == ALIGN_CENTER) {
-        float width = AlphanumericsGetLineLen(text) * xcell * scale;
+        float width = AlphanumericsGetLineLen(text) * xcell * scale * AlphanumericsPrintScale;
         cursorX = x - (width / 2);
-        cursorX += (xcell * scale) / 2;
+        cursorX += (xcell * scale * AlphanumericsPrintScale) / 2;
     }
 
     cursorY = y;
@@ -865,11 +867,11 @@ void AlphanumericsPrint(int alignment, float scale, float x, float y, vector::pe
                 cursorX = x;
             }
             if (alignment == ALIGN_CENTER) {
-                float width = AlphanumericsGetLineLen(&text[i + 1]) * xcell * scale;
+                float width = AlphanumericsGetLineLen(&text[i + 1]) * xcell * scale * AlphanumericsPrintScale;
                 cursorX = x - (width / 2);
             }
 
-            cursorY -= ycell * scale;
+            cursorY -= ycell * scale * AlphanumericsPrintScale;
         } else {
             const bool lower = (c >= 'a' && c <= 'z');
 
@@ -1077,7 +1079,7 @@ void AlphanumericsPrint(int alignment, float scale, float x, float y, vector::pe
             _topAscentOffset += _topAscent;
             _bottomAscentOffset += _bottomAscent;
 
-            cursorX += xcell * scale;
+            cursorX += xcell * scale * AlphanumericsPrintScale;
         }
     }
 
@@ -1111,10 +1113,10 @@ static inline void drawText(float scale, Point3d* p, vector::pen* color, bool lo
         if (end.x > 0)
             end.x += _topAscentOffset * (endXOff * endYOff);
 
-        start.x *= scale * .65;
-        start.y *= scale * AlphanumericsPrintVScale * (lower ? .6 : 1.0);
-        end.x *= scale * .65;
-        end.y *= scale * AlphanumericsPrintVScale * (lower ? .6 : 1.0);
+        start.x *= scale * AlphanumericsPrintScale * .65;
+        start.y *= scale * AlphanumericsPrintScale * AlphanumericsPrintVScale * (lower ? .6 : 1.0);
+        end.x *= scale * AlphanumericsPrintScale * .65;
+        end.y *= scale * AlphanumericsPrintScale * AlphanumericsPrintVScale * (lower ? .6 : 1.0);
 
         if (!lower) {
             start.y += scale * .4;

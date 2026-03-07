@@ -192,21 +192,7 @@ void entityPlayerMissile::destroyTransition()
 void entityPlayerMissile::draw()
 {
     if (getState() == entity::ENTITY_STATE_RUNNING) {
-        // Set the proper color for the player
-        switch (mPlayerSource) {
-        case 0:
-            mPen = theGame->getPlayer1()->getMissilesPen();
-            break;
-        case 1:
-            mPen = theGame->getPlayer2()->getMissilesPen();
-            break;
-        case 2:
-            mPen = theGame->getPlayer3()->getMissilesPen();
-            break;
-        case 3:
-            mPen = theGame->getPlayer4()->getMissilesPen();
-            break;
-        }
+        mPen = theGame->getPlayer1()->getMissilesPen();
 
         mPen.lineRadius = 12;
 

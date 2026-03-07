@@ -1,8 +1,11 @@
 #pragma once
 
+#include "inputmap.hpp"
 #include "point3d.hpp"
 
 #include <SDL3/SDL.h>
+
+#include <memory>
 
 class controls
 {
@@ -43,4 +46,7 @@ class controls
 
     SDL_Gamepad* mGamepads[MAX_GAMEPADS] {};
     int mNumGamepads { 0 };
+
+    // advmame.rc input mapping (used when configured, replaces keyboard/gamepad)
+    std::unique_ptr<InputMap> mInputMap;
 };

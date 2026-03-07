@@ -16,6 +16,7 @@ class texture
     unsigned mHeight;
 
     bool mLoaded;
+    bool mLoadAttempted;
 
   private:
     unsigned int mTextureId;

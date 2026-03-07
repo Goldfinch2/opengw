@@ -8,6 +8,7 @@
 #include "renderer_dvg.h"
 #include "debuglog.h"
 #include "dvg_serial.h"
+#include "font.hpp"
 #include "settings.hpp"
 
 #include <SDL3/SDL.h>
@@ -72,6 +73,9 @@ static bool  g_stripHasFirst = false;
 // Current color (set by setColor, used by lineLoop/lineStrip/triangleFan)
 static float g_curR = 1.0f, g_curG = 1.0f, g_curB = 1.0f, g_curA = 1.0f;
 
+// 2D screen-space mode (for HUD/text drawn in NDC -1..1)
+static bool g_screenSpace = false;
+
 static uint32_t g_targetFps = 40;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -102,11 +106,7 @@ static bool worldToDvg(float wx, float wy, int32_t* outX, int32_t* outY)
     float nx = ex / visHalfW;
     float ny = ey / visHalfH;
 
-    // Clip to visible area
-    if (nx < -1.2f || nx > 1.2f || ny < -1.2f || ny > 1.2f)
-        return false;
-
-    // Map NDC to DVG (0..4095)
+    // Map NDC to DVG (0..4095) — clipLine() handles out-of-range coords
     *outX = (int32_t)((nx + 1.0f) * 0.5f * DVG_RES_MAX);
     *outY = (int32_t)((ny + 1.0f) * 0.5f * DVG_RES_MAX);
 
@@ -256,8 +256,24 @@ static void addWorldLine(float x0, float y0, float x1, float y1,
     if (a < 0.1f) return;
 
     int32_t dx0, dy0, dx1, dy1;
-    if (!worldToDvg(x0, y0, &dx0, &dy0)) return;
-    if (!worldToDvg(x1, y1, &dx1, &dy1)) return;
+
+    if (g_screenSpace) {
+        // Screen-space mode: coordinates are NDC (-1..1), map directly to DVG
+        dx0 = (int32_t)((x0 + 1.0f) * 0.5f * DVG_RES_MAX);
+        dy0 = (int32_t)((y0 + 1.0f) * 0.5f * DVG_RES_MAX);
+        dx1 = (int32_t)((x1 + 1.0f) * 0.5f * DVG_RES_MAX);
+        dy1 = (int32_t)((y1 + 1.0f) * 0.5f * DVG_RES_MAX);
+
+
+        if (g_verticalDisplay) {
+            int32_t tmp;
+            tmp = dx0; dx0 = DVG_RES_MAX - dy0; dy0 = 512 + (int32_t)(0.75f * tmp);
+            tmp = dx1; dx1 = DVG_RES_MAX - dy1; dy1 = 512 + (int32_t)(0.75f * tmp);
+        }
+    } else {
+        if (!worldToDvg(x0, y0, &dx0, &dy0)) return;
+        if (!worldToDvg(x1, y1, &dx1, &dy1)) return;
+    }
 
     uint8_t cr, cg, cb;
     colorToRgb(r, g, b, a, &cr, &cg, &cb);
@@ -531,7 +547,7 @@ void init(int width, int height)
 
     if (!s.serialPort[0])
     {
-        debuglog::log(true,"DVG renderer: no serial_port configured in settings.txt\n");
+        debuglog::log(true,"DVG renderer: no serial_port configured in opengw.cfg\n");
         debuglog::log(true,"DVG renderer: running without hardware (vector count will be logged)\n");
         return;
     }
@@ -622,6 +638,13 @@ void translate(float x, float y, float z)
     g_camX += x;
     g_camY += y;
     g_camZ += z;
+}
+
+void setScreenSpace(bool enabled)
+{
+    g_screenSpace = enabled;
+    // DVG has 4096 resolution vs ~600 for GL; scale font up accordingly
+    font::AlphanumericsPrintScale = enabled ? 2.0f : 1.0f;
 }
 
 // ── Lines ────────────────────────────────────────────────────────────────

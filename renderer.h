@@ -28,6 +28,9 @@ namespace renderer
     // Transform
     void translate(float x, float y, float z = 0.0f);
 
+    // Switch to/from 2D screen-space mode (NDC -1..1 mapped directly to display)
+    void setScreenSpace(bool enabled);
+
     // Batched line drawing (GL_LINES equivalent)
     void beginLines();
     void endLines();

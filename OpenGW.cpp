@@ -10,6 +10,11 @@
 #include <cstdio>
 #include <memory>
 
+// Shared globals
+static SDL_Window* window;
+static int mWidth, mHeight;
+const bool* keyboardState;
+
 #if !defined(USE_DVG_RENDERER)
 #include "blur.hpp"
 
@@ -56,15 +61,84 @@ static void updateFps(Uint32 now);
 
 #include "font.hpp"
 #include "highscore.hpp"
+#include "lodepng.h"
 #include "players.hpp"
 #include "renderer.h"
 
-#endif // !USE_DVG_RENDERER
+static SDL_Renderer* g_dvgRenderer = nullptr;
+static SDL_Texture*  g_marqueeTexture = nullptr;
 
-// Shared globals
-static SDL_Window* window;
-static int mWidth, mHeight;
-const bool* keyboardState;
+static void dvgShowMarquee()
+{
+    if (!g_dvgRenderer) return;
+
+    std::vector<unsigned char> image;
+    unsigned w, h;
+    std::string marqueeFile = settings::get().marqueeFile();
+    unsigned error = lodepng::decode(image, w, h, marqueeFile);
+    if (error)
+    {
+        debuglog::log(true, "Marquee: %s not found (%s)\n",
+                      marqueeFile.c_str(), lodepng_error_text(error));
+        return;
+    }
+
+    SDL_Surface* surface = SDL_CreateSurfaceFrom(
+        (int)w, (int)h, SDL_PIXELFORMAT_RGBA32, image.data(), (int)(w * 4));
+    if (!surface)
+    {
+        debuglog::log(true, "Marquee: SDL_CreateSurfaceFrom failed: %s\n", SDL_GetError());
+        return;
+    }
+
+    g_marqueeTexture = SDL_CreateTextureFromSurface(g_dvgRenderer, surface);
+    SDL_DestroySurface(surface);
+
+    if (!g_marqueeTexture)
+    {
+        debuglog::log(true, "Marquee: SDL_CreateTextureFromSurface failed: %s\n", SDL_GetError());
+        return;
+    }
+
+    int winW, winH;
+    SDL_GetWindowSize(window, &winW, &winH);
+
+    float scaleX = (float)winW / (float)w;
+    float scaleY = (float)winH / (float)h;
+    float scale  = (scaleX < scaleY) ? scaleX : scaleY;
+
+    float dstW = (float)w * scale;
+    float dstH = (float)h * scale;
+    SDL_FRect dst = { ((float)winW - dstW) / 2.0f, ((float)winH - dstH) / 2.0f, dstW, dstH };
+
+    // Render twice for kmsdrm double-buffering
+    for (int i = 0; i < 2; i++)
+    {
+        SDL_SetRenderDrawColor(g_dvgRenderer, 0, 0, 0, 255);
+        SDL_RenderClear(g_dvgRenderer);
+        SDL_RenderTexture(g_dvgRenderer, g_marqueeTexture, nullptr, &dst);
+        SDL_RenderPresent(g_dvgRenderer);
+    }
+
+    debuglog::log(true, "Marquee: displayed %s (%ux%u)\n", marqueeFile.c_str(), w, h);
+}
+
+static void dvgClearMarquee()
+{
+    if (g_marqueeTexture)
+    {
+        SDL_DestroyTexture(g_marqueeTexture);
+        g_marqueeTexture = nullptr;
+    }
+    if (g_dvgRenderer)
+    {
+        SDL_SetRenderDrawColor(g_dvgRenderer, 0, 0, 0, 255);
+        SDL_RenderClear(g_dvgRenderer);
+        SDL_RenderPresent(g_dvgRenderer);
+    }
+}
+
+#endif // !USE_DVG_RENDERER
 
 static bool handleEvents()
 {
@@ -157,8 +231,8 @@ int main(int /*argc*/, char** /*argv*/)
     }
 
     // Detect display resolution
-    int displayWidth = settings::get().displayWidth;
-    int displayHeight = settings::get().displayHeight;
+    int displayWidth = 800;
+    int displayHeight = 600;
     {
         SDL_DisplayID displayID = SDL_GetPrimaryDisplay();
         const SDL_DisplayMode* dm = SDL_GetCurrentDisplayMode(displayID);
@@ -387,7 +461,7 @@ static void run()
         renderer::beginFrame(mWidth, mHeight);
 
         scene::mPass = scene::RENDERPASS_PRIMARY;
-        theGame->draw(scene::RENDERPASS_PRIMARY);
+        g_scene.draw(scene::RENDERPASS_PRIMARY);
 
         renderer::present();
     }
@@ -408,8 +482,8 @@ int main(int /*argc*/, char** /*argv*/)
     }
 
     // Detect display resolution (used for aspect ratio calculation)
-    mWidth = settings::get().displayWidth;
-    mHeight = settings::get().displayHeight;
+    mWidth = 800;
+    mHeight = 600;
     {
         SDL_DisplayID displayID = SDL_GetPrimaryDisplay();
         const SDL_DisplayMode* dm = SDL_GetCurrentDisplayMode(displayID);
@@ -431,6 +505,13 @@ int main(int /*argc*/, char** /*argv*/)
     }
     SDL_HideCursor();
 
+    // Create SDL renderer for marquee display on the Pi's screen
+    g_dvgRenderer = SDL_CreateRenderer(window, nullptr);
+    if (g_dvgRenderer)
+        dvgShowMarquee();
+    else
+        debuglog::log(true, "SDL_CreateRenderer failed: %s\n", SDL_GetError());
+
     srand(SDL_GetTicks());
     make_sin_cos_tables();
 
@@ -438,28 +519,24 @@ int main(int /*argc*/, char** /*argv*/)
 
     debuglog::log(true, "Game created, gameMode=%d gameType=%d\n", game::mGameMode, game::mGameType);
     debuglog::log(true, "Player1 joined=%d state=%d\n", theGame->getPlayer1()->mJoined, theGame->getPlayer1()->getState());
-    debuglog::log(true, "Player2 joined=%d state=%d\n", theGame->getPlayer2()->mJoined, theGame->getPlayer2()->getState());
-    debuglog::log(true, "Player3 joined=%d state=%d\n", theGame->getPlayer3()->mJoined, theGame->getPlayer3()->getState());
-    debuglog::log(true, "Player4 joined=%d state=%d\n", theGame->getPlayer4()->mJoined, theGame->getPlayer4()->getState());
 
     renderer::init(mWidth, mHeight);
 
-    // Force single player, skip selection screen
-    game::mCredits = 1;
-    theGame->getPlayer1()->mJoined = true;
-    theGame->startGame(game::GAMETYPE_SINGLEPLAYER);
+    // DVG display is square — aspect ratio 1:1
+    g_scene.size(1.0f, 1.0f);
 
-    debuglog::log(true, "startGame called, gameMode=%d gameType=%d\n", game::mGameMode, game::mGameType);
-    debuglog::log(true, "Player1 joined=%d state=%d\n", theGame->getPlayer1()->mJoined, theGame->getPlayer1()->getState());
-    debuglog::log(true, "Player2 joined=%d state=%d\n", theGame->getPlayer2()->mJoined, theGame->getPlayer2()->getState());
-    debuglog::log(true, "Player3 joined=%d state=%d\n", theGame->getPlayer3()->mJoined, theGame->getPlayer3()->getState());
-    debuglog::log(true, "Player4 joined=%d state=%d\n", theGame->getPlayer4()->mJoined, theGame->getPlayer4()->getState());
-    debuglog::log(true, "numPlayers=%d\n", theGame->numPlayers());
+    debuglog::log(true, "Starting in attract mode (gameMode=%d)\n", game::mGameMode);
 
     run();
 
     g_scene.shutdown();
     renderer::shutdown();
+
+    dvgClearMarquee();
+    if (g_dvgRenderer) {
+        SDL_DestroyRenderer(g_dvgRenderer);
+        g_dvgRenderer = nullptr;
+    }
 
     debuglog::log(true, "Done\n");
     debuglog::close();

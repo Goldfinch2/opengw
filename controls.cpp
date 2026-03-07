@@ -1,5 +1,6 @@
 #include "controls.hpp"
 #include "debuglog.h"
+#include "settings.hpp"
 
 #include <SDL3/SDL_joystick.h>
 
@@ -13,8 +14,16 @@ controls::controls()
 {
     debuglog::log(true,"Initing controls\n");
 
-    // Scan for initially connected gamepads
-    scanForGamepads();
+    // If advmame.rc is configured, use its input bindings
+    const auto& cfg = settings::get();
+    if (cfg.advmamerc[0]) {
+        mInputMap = std::make_unique<InputMap>();
+        mInputMap->load(cfg.advmamerc);
+        mInputMap->openJoysticks();
+    } else {
+        // Fall back to SDL gamepad API
+        scanForGamepads();
+    }
 }
 
 controls::~controls()
@@ -116,31 +125,62 @@ void controls::handleGamepadRemoved(SDL_JoystickID instanceId)
 
 Point3d controls::getLeftStick(int player)
 {
+    if (mInputMap) {
+        int x = 0, y = 0;
+        if (mInputMap->isActive(GameAction::MOVE_UP))    x += 1;
+        if (mInputMap->isActive(GameAction::MOVE_DOWN))  x -= 1;
+        if (mInputMap->isActive(GameAction::MOVE_LEFT))  y += 1;
+        if (mInputMap->isActive(GameAction::MOVE_RIGHT)) y -= 1;
+        return Point3d(x, y, 0);
+    }
     return readKeyboardLeftStick(player) + readGamepadLeftStick(player);
 }
 
 Point3d controls::getRightStick(int player)
 {
+    if (mInputMap) {
+        int x = 0, y = 0;
+        if (mInputMap->isActive(GameAction::AIM_UP))    x += 1;
+        if (mInputMap->isActive(GameAction::AIM_DOWN))  x -= 1;
+        if (mInputMap->isActive(GameAction::AIM_LEFT))  y += 1;
+        if (mInputMap->isActive(GameAction::AIM_RIGHT)) y -= 1;
+        return Point3d(x, y, 0);
+    }
     return readKeyboardRightStick(player) + readGamepadRightStick(player);
 }
 
 bool controls::getTriggerButton(int player)
 {
+    if (mInputMap)
+        return mInputMap->isActive(GameAction::FIRE);
     return readKeyboardTrigger(player) || readGamepadTrigger(player);
 }
 
 bool controls::getStartButton(int player)
 {
+    if (mInputMap) {
+        switch (player) {
+        case 0: return mInputMap->isActive(GameAction::START_P1);
+        case 1: return mInputMap->isActive(GameAction::START_P2);
+        case 2: return mInputMap->isActive(GameAction::START_P3);
+        case 3: return mInputMap->isActive(GameAction::START_P4);
+        }
+        return false;
+    }
     return readKeyboardStart(player) || readGamepadStart(player);
 }
 
 bool controls::getBackButton(int player)
 {
+    if (mInputMap)
+        return mInputMap->isActive(GameAction::BACK);
     return readKeyboardBack(player) || readGamepadBack(player);
 }
 
 bool controls::getPauseButton(int player)
 {
+    if (mInputMap)
+        return mInputMap->isActive(GameAction::PAUSE);
     return readKeyboardPause(player) || readGamepadPause(player);
 }
 
@@ -187,7 +227,7 @@ Point3d controls::readKeyboardRightStick(int /*player*/)
 
 bool controls::readKeyboardTrigger(int /*player*/)
 {
-    return keyboardState[SDL_SCANCODE_SPACE];
+    return keyboardState[SDL_SCANCODE_SPACE] || keyboardState[SDL_SCANCODE_LCTRL];
 }
 
 bool controls::readKeyboardStart(int player)

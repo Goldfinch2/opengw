@@ -5,6 +5,7 @@
 #include "highscore.hpp"
 #include "players.hpp"
 #include "scene.hpp"
+#include "settings.hpp"
 
 #include <cstdio>
 
@@ -285,7 +286,7 @@ void highscore::drawTable()
 void highscore::load()
 {
     FILE* pFile;
-    pFile = fopen("scores.sav", "rb");
+    pFile = fopen(settings::get().saveFile("scores.sav").c_str(), "rb");
     if (pFile) {
         size_t ret = fread(mEntries, 1, sizeof(mEntries), pFile);
         if (ret <= 0) {
@@ -298,7 +299,7 @@ void highscore::load()
 void highscore::save()
 {
     FILE* pFile;
-    pFile = fopen("scores.sav", "wb");
+    pFile = fopen(settings::get().saveFile("scores.sav").c_str(), "wb");
     if (pFile) {
         size_t ret = fwrite(mEntries, 1, sizeof(mEntries), pFile);
         if (ret <= 0) {

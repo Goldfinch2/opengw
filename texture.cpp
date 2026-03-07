@@ -7,6 +7,7 @@ texture::texture(void)
     mHeight = 0;
     mTextureId = 0;
     mLoaded = false;
+    mLoadAttempted = false;
 }
 
 texture::~texture(void)
@@ -21,8 +22,6 @@ texture::~texture(void)
 
 void texture::load(const char* filename)
 {
-    mLoaded = true;
-
     // Load file and decode image.
     static std::vector<unsigned char> image;
 
@@ -31,8 +30,12 @@ void texture::load(const char* filename)
     // If there's an error, display it.
     if (error != 0) {
         debuglog::log(true,"texture::load(%s) error: %s\n", filename, lodepng_error_text(error));
+        mLoadAttempted = true;
         return;
     }
+
+    mLoaded = true;
+    mLoadAttempted = true;
 
     glGenTextures(1, &mTextureId);
     glBindTexture(GL_TEXTURE_2D, mTextureId);

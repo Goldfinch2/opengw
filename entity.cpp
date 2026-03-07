@@ -284,21 +284,13 @@ void entity::hit(entity* aEntity)
         entityPlayerMissile* missile = dynamic_cast<entityPlayerMissile*>(aEntity);
         if (missile) {
             if (mScoreValue) {
-                // Add points and display them at the destruction point
-                if (missile->mPlayerSource == 0)
-                    theGame->getPlayer1()->addKillAtLocation(mScoreValue, getPos());
-                else if (missile->mPlayerSource == 1)
-                    theGame->getPlayer2()->addKillAtLocation(mScoreValue, getPos());
-                else if (missile->mPlayerSource == 2)
-                    theGame->getPlayer3()->addKillAtLocation(mScoreValue, getPos());
-                else if (missile->mPlayerSource == 3)
-                    theGame->getPlayer4()->addKillAtLocation(mScoreValue, getPos());
+                theGame->getPlayer1()->addKillAtLocation(mScoreValue, getPos());
             }
 
             theGame->mSound->playTrack(SOUNDID_ENEMYHIT);
         } else if (aEntity && aEntity->getType() == entity::ENTITY_TYPE_BLACKHOLE) {
             theGame->mSound->playTrack(SOUNDID_ENEMYHIT);
-        } else if ((aEntity && (aEntity->getType() == entity::ENTITY_TYPE_PLAYER1)) || (aEntity->getType() == entity::ENTITY_TYPE_PLAYER2)) {
+        } else if (aEntity && aEntity->getType() == entity::ENTITY_TYPE_PLAYER1) {
             theGame->mSound->playTrack(SOUNDID_ENEMYHIT);
         }
     } else {

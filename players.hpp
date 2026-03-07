@@ -19,14 +19,8 @@ class players
     player* getRandomActivePlayer();
 
     player* getPlayer1() { return mPlayer1.get(); }
-    player* getPlayer2() { return mPlayer2.get(); }
-    player* getPlayer3() { return mPlayer3.get(); }
-    player* getPlayer4() { return mPlayer4.get(); }
 
     static std::unique_ptr<player> mPlayer1;
-    static std::unique_ptr<player> mPlayer2;
-    static std::unique_ptr<player> mPlayer3;
-    static std::unique_ptr<player> mPlayer4;
 
     const game& mGame;
 };

@@ -58,70 +58,23 @@ void spawner::run(void)
         if (theGame->getPlayer1()->getState() == entity::ENTITY_STATE_RUNNING)
             ++numPlayersActive;
     }
-    if (theGame->getPlayer2()->mJoined) {
-        if (theGame->getPlayer2()->getState() == entity::ENTITY_STATE_RUNNING)
-            ++numPlayersActive;
-    }
-    if (theGame->getPlayer3()->mJoined) {
-        if (theGame->getPlayer3()->getState() == entity::ENTITY_STATE_RUNNING)
-            ++numPlayersActive;
-    }
-    if (theGame->getPlayer4()->mJoined) {
-        if (theGame->getPlayer4()->getState() == entity::ENTITY_STATE_RUNNING)
-            ++numPlayersActive;
-    }
 
-    // Respawn the players as needed
-
+    // Respawn the player as needed
     static int player1SpawnTimer = 0;
-    static int player2SpawnTimer = 0;
-    static int player3SpawnTimer = 0;
-    static int player4SpawnTimer = 0;
 
-    // Monitor players and respawn as needed
-    for (int i = 0; i < 4; i++) {
-        player* player;
-        int* timer;
-        switch (i) {
-        case 0:
-            player = theGame->getPlayer1();
-            timer = &player1SpawnTimer;
-            break;
-        case 1:
-            player = theGame->getPlayer2();
-            timer = &player2SpawnTimer;
-            break;
-        case 2:
-            player = theGame->getPlayer3();
-            timer = &player3SpawnTimer;
-            break;
-        case 3:
-            player = theGame->getPlayer4();
-            timer = &player4SpawnTimer;
-            break;
-        }
+    {
+        player* p = theGame->getPlayer1();
+        if (p->mJoined && (p->getState() == entity::ENTITY_STATE_INACTIVE)) {
+            mSpawnWaitTimer = 50;
 
-        if (player->mJoined && (player->getState() == entity::ENTITY_STATE_INACTIVE)) {
-            if (theGame->numPlayers() == 1) {
-                mSpawnWaitTimer = 50;
-            }
+            if (++player1SpawnTimer >= 50) {
+                player1SpawnTimer = 0;
 
-            if (++(*timer) >= 50) {
-                *timer = 0;
-
-                player->takeLife();
-                if (player->getNumLives() > 0) {
-                    player->setState(entity::ENTITY_STATE_SPAWN_TRANSITION);
+                p->takeLife();
+                if (p->getNumLives() > 0) {
+                    p->setState(entity::ENTITY_STATE_SPAWN_TRANSITION);
                 } else {
-                    if (theGame->numPlayers() == 1) {
-                        game::mGameMode = game::GAMEMODE_GAMEOVER_TRANSITION;
-                    } else {
-                        // Multiplayer
-                        // Wait until no more players are active
-                        if (numPlayersActive == 0) {
-                            game::mGameMode = game::GAMEMODE_GAMEOVER_TRANSITION;
-                        }
-                    }
+                    game::mGameMode = game::GAMEMODE_GAMEOVER_TRANSITION;
                 }
             }
         }

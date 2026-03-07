@@ -32,11 +32,13 @@ settings::settings()
     mAttractors = 50;
     mGridPasses = 4;
 
-    displayWidth = 800;
-    displayHeight = 600;
-
     serialPort[0] = '\0';
     sortVectors = true;
+
+    marquee[0] = '\0';
+    advmamerc[0] = '\0';
+    sounds[0] = '\0';
+    save[0] = '\0';
 
 #if defined(USE_DVG_RENDERER)
     mParticles = 100;
@@ -56,11 +58,7 @@ settings::settings()
 // Returns true if the key was handled
 static bool applyKey(settings& s, const char* key, const char* value)
 {
-    if (strcmp(key, "display_width") == 0)
-        s.displayWidth = atoi(value);
-    else if (strcmp(key, "display_height") == 0)
-        s.displayHeight = atoi(value);
-    else if (strcmp(key, "enable_glow") == 0)
+    if (strcmp(key, "enable_glow") == 0)
         s.mEnableGlow = (strcmp(value, "true") == 0);
     else if (strcmp(key, "grid_smoothing") == 0)
         s.mGridSmoothing = (strcmp(value, "true") == 0);
@@ -84,14 +82,26 @@ static bool applyKey(settings& s, const char* key, const char* value)
         s.mCreditsPerGame = (strcmp(value, "true") == 0);
     else if (strcmp(key, "target_fps") == 0)
         s.targetFps = atoi(value);
-    else if (strcmp(key, "serial_port") == 0) {
-        strncpy(s.serialPort, value, sizeof(s.serialPort) - 1);
-        s.serialPort[sizeof(s.serialPort) - 1] = '\0';
-    }
     else if (strcmp(key, "sort_vectors") == 0)
         s.sortVectors = (strcmp(value, "true") == 0);
     else if (strcmp(key, "dvg_refresh_rate") == 0)
         s.dvgRefreshRate = atoi(value);
+    else if (strcmp(key, "marquee") == 0) {
+        strncpy(s.marquee, value, sizeof(s.marquee) - 1);
+        s.marquee[sizeof(s.marquee) - 1] = '\0';
+    }
+    else if (strcmp(key, "advmamerc") == 0) {
+        strncpy(s.advmamerc, value, sizeof(s.advmamerc) - 1);
+        s.advmamerc[sizeof(s.advmamerc) - 1] = '\0';
+    }
+    else if (strcmp(key, "sounds") == 0) {
+        strncpy(s.sounds, value, sizeof(s.sounds) - 1);
+        s.sounds[sizeof(s.sounds) - 1] = '\0';
+    }
+    else if (strcmp(key, "save") == 0) {
+        strncpy(s.save, value, sizeof(s.save) - 1);
+        s.save[sizeof(s.save) - 1] = '\0';
+    }
     else
         return false;
 
@@ -100,13 +110,13 @@ static bool applyKey(settings& s, const char* key, const char* value)
 
 void settings::load()
 {
-    FILE* file = fopen("settings.txt", "r");
+    FILE* file = fopen("opengw.cfg", "r");
     if (!file) {
-        debuglog::log(true,"settings.txt not found, using defaults\n");
+        debuglog::log(true,"opengw.cfg not found, using defaults\n");
         return;
     }
 
-    debuglog::log(true, "Loading settings.txt\n");
+    debuglog::log(true, "Loading opengw.cfg\n");
 
     // Section tracking: 0 = global (applies to all), 1 = sdl, 2 = dvg
     enum Section { SECTION_GLOBAL, SECTION_SDL, SECTION_DVG };
@@ -155,4 +165,69 @@ void settings::load()
     }
 
     fclose(file);
+
+#if defined(USE_DVG_RENDERER)
+    // Read serial port from advmame.rc (vector_aux_renderer_port)
+    {
+        const char* rcPath = advmamerc[0] ? advmamerc : "/home/pi/.advance/advmame.rc";
+        FILE* rc = fopen(rcPath, "r");
+        if (rc)
+        {
+            char rcLine[1024];
+            while (fgets(rcLine, sizeof(rcLine), rc))
+            {
+                int rcLen = (int)strlen(rcLine);
+                while (rcLen > 0 && (rcLine[rcLen - 1] == '\n' || rcLine[rcLen - 1] == '\r'))
+                    rcLine[--rcLen] = 0;
+
+                if (strncmp(rcLine, "vector_aux_renderer_port", 24) == 0 &&
+                    (rcLine[24] == ' ' || rcLine[24] == 0))
+                {
+                    char* val = rcLine + 24;
+                    while (*val == ' ') val++;
+                    if (*val && strcmp(val, "auto") != 0)
+                    {
+                        strncpy(serialPort, val, sizeof(serialPort) - 1);
+                        serialPort[sizeof(serialPort) - 1] = '\0';
+                        debuglog::log(true, "Serial port from %s: %s\n", rcPath, serialPort);
+                    }
+                    break;
+                }
+            }
+            fclose(rc);
+        }
+        else
+        {
+            debuglog::log(true, "Could not open %s for serial port\n", rcPath);
+        }
+    }
+#endif
+}
+
+std::string settings::marqueeFile() const
+{
+    std::string dir = marquee[0] ? marquee : "artwork";
+    std::string primary = dir + "/opengw.png";
+
+    FILE* f = fopen(primary.c_str(), "r");
+    if (f) {
+        fclose(f);
+        return primary;
+    }
+
+    return dir + "/default.png";
+}
+
+std::string settings::soundFile(const char* filename) const
+{
+    if (sounds[0])
+        return std::string(sounds) + "/" + filename;
+    return std::string("sounds/") + filename;
+}
+
+std::string settings::saveFile(const char* filename) const
+{
+    if (save[0])
+        return std::string(save) + "/" + filename;
+    return std::string(filename);
 }

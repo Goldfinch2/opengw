@@ -60,10 +60,21 @@ $(OBJDIR_DVG)/%.d: %.cpp | $(OBJDIR_DVG)
 $(OBJDIR_DVG)/%.o: %.cpp
 	$(CXX) $(CXXFLAGS_DVG) -c $< -o $@
 
+PREFIX = /usr/local/share/advance
+
+install: all
+	install -d $(PREFIX)
+	install -d $(PREFIX)/artwork
+	install -d $(PREFIX)/opengw_dir/sounds
+	install -m 755 opengw_sdl opengw_dvg $(PREFIX)/
+	install -m 644 opengw.cfg $(PREFIX)/
+	install -m 644 images/opengw.png $(PREFIX)/artwork/
+	install -m 644 sounds/*.wav $(PREFIX)/opengw_dir/sounds/
+
 clean:
 	rm -rf $(OBJDIR_SDL) $(OBJDIR_DVG) opengw_sdl opengw_dvg
 
-.PHONY: all sdl dvg clean
+.PHONY: all sdl dvg clean install
 
 # Load .d files
 ifneq ($(MAKECMDGOALS),clean)

@@ -17,7 +17,6 @@
 #include "settings.hpp"
 #include "spawner.hpp"
 #include "stars.hpp"
-#include "menuSelectGameType.hpp"
 
 #include <cstdio>
 #include <memory>
@@ -49,8 +48,6 @@ std::vector<game::PointDisplay> game::mPointDisplays;
 bool game::mPaused = false;
 int game::mCredits = 0;
 int game::mLevel = 0;
-int game::m2PlayerNumLives = 0;
-int game::m2PlayerNumBombs = 0;
 
 game::game()
 {
@@ -68,59 +65,62 @@ game::game()
     // Load our sounds
     //
 
-    mSound->loadTrack("sounds/musicloop.wav", SOUNDID_MUSICLOOP, .2, true);
-    mSound->loadTrack("sounds/menumusicloop.wav", SOUNDID_MENU_MUSICLOOP, .2, true);
-    mSound->loadTrack("sounds/menuselect.wav", SOUNDID_MENU_SELECT, .2, false);
+    const auto& cfg = settings::get();
+    auto snd = [&](const char* f) { return cfg.soundFile(f); };
 
-    mSound->loadTrack("sounds/backgroundnoiseloop.wav", SOUNDID_BACKGROUND_NOISELOOP, .2, true);
+    mSound->loadTrack(snd("musicloop.wav").c_str(), SOUNDID_MUSICLOOP, .2, true);
+    mSound->loadTrack(snd("menumusicloop.wav").c_str(), SOUNDID_MENU_MUSICLOOP, .2, true);
+    mSound->loadTrack(snd("menuselect.wav").c_str(), SOUNDID_MENU_SELECT, .2, false);
 
-    mSound->loadTrack("sounds/playerspawn.wav", SOUNDID_PLAYERSPAWN, 1, false);
-    mSound->loadTrack("sounds/playerhit.wav", SOUNDID_PLAYERHIT, .5, false);
-    mSound->loadTrack("sounds/playerdead.wav", SOUNDID_PLAYERDEAD, .5, false);
-    mSound->loadTrack("sounds/sheildsdown.wav", SOUNDID_SHIELDSLOST, .7, false);
-    mSound->loadTrack("sounds/playerthrust.wav", SOUNDID_PLAYERTHRUST, .2, true);
+    mSound->loadTrack(snd("backgroundnoiseloop.wav").c_str(), SOUNDID_BACKGROUND_NOISELOOP, .2, true);
 
-    mSound->loadTrack("sounds/extralife.wav", SOUNDID_EXTRALIFE, .3, false);
-    mSound->loadTrack("sounds/extrabomb.wav", SOUNDID_EXTRABOMB, .3, false);
+    mSound->loadTrack(snd("playerspawn.wav").c_str(), SOUNDID_PLAYERSPAWN, 1, false);
+    mSound->loadTrack(snd("playerhit.wav").c_str(), SOUNDID_PLAYERHIT, .5, false);
+    mSound->loadTrack(snd("playerdead.wav").c_str(), SOUNDID_PLAYERDEAD, .5, false);
+    mSound->loadTrack(snd("sheildsdown.wav").c_str(), SOUNDID_SHIELDSLOST, .7, false);
+    mSound->loadTrack(snd("playerthrust.wav").c_str(), SOUNDID_PLAYERTHRUST, .2, true);
 
-    mSound->loadTrack("sounds/bomb.wav", SOUNDID_BOMB, .5, false);
+    mSound->loadTrack(snd("extralife.wav").c_str(), SOUNDID_EXTRALIFE, .3, false);
+    mSound->loadTrack(snd("extrabomb.wav").c_str(), SOUNDID_EXTRABOMB, .3, false);
 
-    mSound->loadTrack("sounds/multiplieradvance.wav", SOUNDID_MULTIPLIERADVANCE, .3, false);
+    mSound->loadTrack(snd("bomb.wav").c_str(), SOUNDID_BOMB, .5, false);
 
-    mSound->loadTrack("sounds/missilehitwall.wav", SOUNDID_MISSILEHITWALL, .3, false);
+    mSound->loadTrack(snd("multiplieradvance.wav").c_str(), SOUNDID_MULTIPLIERADVANCE, .3, false);
 
-    mSound->loadTrack("sounds/gravitywelldestroyed.wav", SOUNDID_GRAVITYWELLDESTROYED, .3, false);
-    mSound->loadTrack("sounds/gravitywelldestroyed.wav", SOUNDID_GRAVITYWELLABSORBED, .1, false);
-    mSound->loadTrack("sounds/gravitywellhit.wav", SOUNDID_GRAVITYWELLHIT, .3, false);
-    mSound->loadTrack("sounds/gravitywellalert.wav", SOUNDID_GRAVITYWELLALERT, .5, false);
-    mSound->loadTrack("sounds/gravitywellexplode.wav", SOUNDID_GRAVITYWELLEXPLODE, .5, false);
+    mSound->loadTrack(snd("missilehitwall.wav").c_str(), SOUNDID_MISSILEHITWALL, .3, false);
 
-    mSound->loadTrack("sounds/repulsor.wav", SOUNDID_REPULSORA, .4, true);
-    mSound->loadTrack("sounds/repulsor.wav", SOUNDID_REPULSORB, .4, true);
-    mSound->loadTrack("sounds/repulsor.wav", SOUNDID_REPULSORC, .4, true);
-    mSound->loadTrack("sounds/repulsor.wav", SOUNDID_REPULSORD, .4, true);
+    mSound->loadTrack(snd("gravitywelldestroyed.wav").c_str(), SOUNDID_GRAVITYWELLDESTROYED, .3, false);
+    mSound->loadTrack(snd("gravitywelldestroyed.wav").c_str(), SOUNDID_GRAVITYWELLABSORBED, .1, false);
+    mSound->loadTrack(snd("gravitywellhit.wav").c_str(), SOUNDID_GRAVITYWELLHIT, .3, false);
+    mSound->loadTrack(snd("gravitywellalert.wav").c_str(), SOUNDID_GRAVITYWELLALERT, .5, false);
+    mSound->loadTrack(snd("gravitywellexplode.wav").c_str(), SOUNDID_GRAVITYWELLEXPLODE, .5, false);
 
-    mSound->loadTrack("sounds/gravitywellhumloop.wav", SOUNDID_GRAVITYWELL_HUMLOOPA, .3, true);
-    mSound->loadTrack("sounds/gravitywellhumloop.wav", SOUNDID_GRAVITYWELL_HUMLOOPB, .3, true);
-    mSound->loadTrack("sounds/gravitywellhumloop.wav", SOUNDID_GRAVITYWELL_HUMLOOPC, .3, true);
-    mSound->loadTrack("sounds/gravitywellhumloop.wav", SOUNDID_GRAVITYWELL_HUMLOOPD, .3, true);
-    mSound->loadTrack("sounds/gravitywellhumloop.wav", SOUNDID_GRAVITYWELL_HUMLOOPE, .3, true);
-    mSound->loadTrack("sounds/gravitywellhumloop.wav", SOUNDID_GRAVITYWELL_HUMLOOPF, .3, true);
+    mSound->loadTrack(snd("repulsor.wav").c_str(), SOUNDID_REPULSORA, .4, true);
+    mSound->loadTrack(snd("repulsor.wav").c_str(), SOUNDID_REPULSORB, .4, true);
+    mSound->loadTrack(snd("repulsor.wav").c_str(), SOUNDID_REPULSORC, .4, true);
+    mSound->loadTrack(snd("repulsor.wav").c_str(), SOUNDID_REPULSORD, .4, true);
 
-    mSound->loadTrack("sounds/enemyspawn1.wav", SOUNDID_ENEMYSPAWN1, .5, false);
-    mSound->loadTrack("sounds/enemyspawn2.wav", SOUNDID_ENEMYSPAWN2, .5, false);
-    mSound->loadTrack("sounds/enemyspawn3.wav", SOUNDID_ENEMYSPAWN3, .5, false);
-    mSound->loadTrack("sounds/enemyspawn4.wav", SOUNDID_ENEMYSPAWN4, .5, false);
-    mSound->loadTrack("sounds/enemyspawn5.wav", SOUNDID_ENEMYSPAWN5, .3, false);
-    mSound->loadTrack("sounds/enemyspawn6.wav", SOUNDID_ENEMYSPAWN6, .3, false);
+    mSound->loadTrack(snd("gravitywellhumloop.wav").c_str(), SOUNDID_GRAVITYWELL_HUMLOOPA, .3, true);
+    mSound->loadTrack(snd("gravitywellhumloop.wav").c_str(), SOUNDID_GRAVITYWELL_HUMLOOPB, .3, true);
+    mSound->loadTrack(snd("gravitywellhumloop.wav").c_str(), SOUNDID_GRAVITYWELL_HUMLOOPC, .3, true);
+    mSound->loadTrack(snd("gravitywellhumloop.wav").c_str(), SOUNDID_GRAVITYWELL_HUMLOOPD, .3, true);
+    mSound->loadTrack(snd("gravitywellhumloop.wav").c_str(), SOUNDID_GRAVITYWELL_HUMLOOPE, .3, true);
+    mSound->loadTrack(snd("gravitywellhumloop.wav").c_str(), SOUNDID_GRAVITYWELL_HUMLOOPF, .3, true);
 
-    mSound->loadTrack("sounds/enemyhit.wav", SOUNDID_ENEMYHIT, .5, false);
+    mSound->loadTrack(snd("enemyspawn1.wav").c_str(), SOUNDID_ENEMYSPAWN1, .5, false);
+    mSound->loadTrack(snd("enemyspawn2.wav").c_str(), SOUNDID_ENEMYSPAWN2, .5, false);
+    mSound->loadTrack(snd("enemyspawn3.wav").c_str(), SOUNDID_ENEMYSPAWN3, .5, false);
+    mSound->loadTrack(snd("enemyspawn4.wav").c_str(), SOUNDID_ENEMYSPAWN4, .5, false);
+    mSound->loadTrack(snd("enemyspawn5.wav").c_str(), SOUNDID_ENEMYSPAWN5, .3, false);
+    mSound->loadTrack(snd("enemyspawn6.wav").c_str(), SOUNDID_ENEMYSPAWN6, .3, false);
 
-    mSound->loadTrack("sounds/mayflies.wav", SOUNDID_MAYFLIES, .1, true);
+    mSound->loadTrack(snd("enemyhit.wav").c_str(), SOUNDID_ENEMYHIT, .5, false);
 
-    mSound->loadTrack("sounds/playerfire1.wav", SOUNDID_PLAYERFIRE1, .9, true);
-    mSound->loadTrack("sounds/playerfire2.wav", SOUNDID_PLAYERFIRE2, .5, true);
-    mSound->loadTrack("sounds/playerfire3.wav", SOUNDID_PLAYERFIRE3, .8, true);
+    mSound->loadTrack(snd("mayflies.wav").c_str(), SOUNDID_MAYFLIES, .1, true);
+
+    mSound->loadTrack(snd("playerfire1.wav").c_str(), SOUNDID_PLAYERFIRE1, .9, true);
+    mSound->loadTrack(snd("playerfire2.wav").c_str(), SOUNDID_PLAYERFIRE2, .5, true);
+    mSound->loadTrack(snd("playerfire3.wav").c_str(), SOUNDID_PLAYERFIRE3, .8, true);
 
     mSound->startSound();
 
@@ -176,9 +176,9 @@ void game::quitThreads()
 
 void game::run()
 {
-    // Credits
+    // Credits (BACK button = coin insert)
     static bool creditButtonLast = false;
-    bool creditButton = false; // mControls->getCreditButton();
+    bool creditButton = mControls->getBackButton(0);
     if (creditButton && !creditButtonLast) {
         ++mCredits;
     }
@@ -191,7 +191,7 @@ void game::run()
     // Pause functionality
     if (mGameMode == GAMEMODE_PLAYING) {
         static bool pauseLast = false;
-        bool pause = mControls->getPauseButton(0) || mControls->getPauseButton(1) || mControls->getPauseButton(2) || mControls->getPauseButton(3);
+        bool pause = mControls->getPauseButton(0);
         if (pause && !pauseLast) {
             game::mSound->playTrack(SOUNDID_MENU_SELECT);
             mPaused = !mPaused;
@@ -226,58 +226,21 @@ void game::run()
     } break;
     case GAMEMODE_CREDITED:
     {
-        if (mControls->getStartButton(0) || mControls->getStartButton(1) || mControls->getStartButton(2) || mControls->getStartButton(3)) {
+        if (mControls->getStartButton(0)) {
         } else {
             mDebounce = false;
         }
         if (!mDebounce) {
             if (mControls->getStartButton(0)) {
-                // Go to game type selection screen
-                menuSelectGameType::init(0);
-                mGameMode = GAMEMODE_CHOOSE_GAMETYPE;
-                mDebounce = true;
-            } else if (mControls->getStartButton(1)) {
-                // Go to game type selection screen
-                menuSelectGameType::init(1);
-                mGameMode = GAMEMODE_CHOOSE_GAMETYPE;
-                mDebounce = true;
-            } else if (mControls->getStartButton(2)) {
-                // Go to game type selection screen
-                menuSelectGameType::init(2);
-                mGameMode = GAMEMODE_CHOOSE_GAMETYPE;
-                mDebounce = true;
-            } else if (mControls->getStartButton(3)) {
-                // Go to game type selection screen
-                menuSelectGameType::init(3);
-                mGameMode = GAMEMODE_CHOOSE_GAMETYPE;
+                --mCredits;
+                getPlayer1()->mJoined = true;
+                startGame(GAMETYPE_SINGLEPLAYER);
                 mDebounce = true;
             }
         }
     } break;
-    case GAMEMODE_CHOOSE_GAMETYPE:
-        // Handled in menuSelectGameType.cpp
-        break;
     case GAMEMODE_PLAYING:
     {
-        if ((numPlayers() > 1) && (m2PlayerNumLives > 0)) {
-            if (mControls->getStartButton(0) && !getPlayer1()->mJoined) {
-                getPlayer1()->takeLife();
-                getPlayer1()->initPlayerForGame();
-            }
-            if (mControls->getStartButton(1) && !getPlayer2()->mJoined) {
-                getPlayer2()->takeLife();
-                getPlayer2()->initPlayerForGame();
-            }
-            if (mControls->getStartButton(2) && !getPlayer3()->mJoined) {
-                getPlayer3()->takeLife();
-                getPlayer3()->initPlayerForGame();
-            }
-            if (mControls->getStartButton(3) && !getPlayer4()->mJoined) {
-                getPlayer4()->takeLife();
-                getPlayer4()->initPlayerForGame();
-            }
-        }
-
         mCamera->followPlayer();
         mStars->run();
         mBlackHoles->run();
@@ -291,23 +254,10 @@ void game::run()
         }
 
         // Music speed
-
         mMusicSpeedTarget = 1;
 
-        // Slow the music down when someone is respawning
+        // Slow the music down when player is respawning
         if (getPlayer1()->mJoined && (getPlayer1()->getState() == entity::ENTITY_STATE_DESTROYED)) {
-            mMusicSpeedTarget = 0;
-            mMusicSpeed = .5;
-        }
-        if (getPlayer2()->mJoined && (getPlayer2()->getState() == entity::ENTITY_STATE_DESTROYED)) {
-            mMusicSpeedTarget = 0;
-            mMusicSpeed = .5;
-        }
-        if (getPlayer3()->mJoined && (getPlayer3()->getState() == entity::ENTITY_STATE_DESTROYED)) {
-            mMusicSpeedTarget = 0;
-            mMusicSpeed = .5;
-        }
-        if (getPlayer4()->mJoined && (getPlayer4()->getState() == entity::ENTITY_STATE_DESTROYED)) {
             mMusicSpeedTarget = 0;
             mMusicSpeed = .5;
         }
@@ -356,6 +306,9 @@ void game::run()
             */
             mGameMode = GAMEMODE_ATTRACT;
             mCamera->mCurrentZoom = 1;
+
+            // Reset player so next game starts clean
+            getPlayer1()->mJoined = false;
         }
         break;
     }
@@ -367,7 +320,7 @@ void game::run()
     }
 
     if ((game::mGameMode == game::GAMEMODE_HIGHSCORES_CHECK) || (game::mGameMode == game::GAMEMODE_HIGHSCORES)) {
-    } else if (mGameMode == GAMEMODE_ATTRACT || mGameMode == GAMEMODE_CREDITED || mGameMode == GAMEMODE_CHOOSE_GAMETYPE) {
+    } else if (mGameMode == GAMEMODE_ATTRACT || mGameMode == GAMEMODE_CREDITED) {
         static int explosionTimer = 0;
 
         ++explosionTimer;
@@ -379,11 +332,6 @@ void game::run()
         }
 
         mCamera->center();
-
-        // Run the game selection menu
-        if (mGameMode == GAMEMODE_CHOOSE_GAMETYPE) {
-            menuSelectGameType::run();
-        }
 
         // Attractors to wander around the fireworks display
 
@@ -404,11 +352,6 @@ void game::run()
                 att->enabled = true;
                 att->attractsParticles = true;
 
-                if (mGameMode == GAMEMODE_CHOOSE_GAMETYPE) {
-                    // static float breathValue = 0;
-                    att->strength = 200; // sin(breathValue) * 10;
-                    // breathValue += .002;
-                }
             }
 
             for (int j = 0; j < 4; j++) {
@@ -470,44 +413,42 @@ void game::run()
             mAttractModeBlackHoles[i]->setPos(mPos);
         }
 
-        if (mGameMode != GAMEMODE_CHOOSE_GAMETYPE) {
-            // Fireworks display
-            static int fw = 99999;
-            ++fw;
-            if (fw >= 5) {
-                fw = 0;
-                static float colorTimer = 0;
-                colorTimer += .08;
+        // Fireworks display
+        static int fw = 99999;
+        ++fw;
+        if (fw >= 5) {
+            fw = 0;
+            static float colorTimer = 0;
+            colorTimer += .08;
 
-                Point3d pos(mathutils::frandFrom0To1() * sizex, mathutils::frandFrom0To1() * sizey);
+            Point3d pos(mathutils::frandFrom0To1() * sizex, mathutils::frandFrom0To1() * sizey);
 
-                {
-                    Point3d angle(0, 0, 0);
-                    float speed = mathutils::frandFrom0To1() * 4;
-                    float spread = (2 * PI);
-                    int num = 50;
-                    int timeToLive = 500;
-                    vector::pen pen;
+            {
+                Point3d angle(0, 0, 0);
+                float speed = mathutils::frandFrom0To1() * 4;
+                float spread = (2 * PI);
+                int num = 50;
+                int timeToLive = 500;
+                vector::pen pen;
 
-                    pen.r = get_sin(colorTimer + ((2 * PI) / 1));
-                    pen.g = get_sin(colorTimer + ((2 * PI) / 2));
-                    pen.b = get_sin(colorTimer + ((2 * PI) / 3));
+                pen.r = get_sin(colorTimer + ((2 * PI) / 1));
+                pen.g = get_sin(colorTimer + ((2 * PI) / 2));
+                pen.b = get_sin(colorTimer + ((2 * PI) / 3));
 
-                    if (pen.r < 0)
-                        pen.r = 0;
-                    if (pen.g < 0)
-                        pen.g = 0;
-                    if (pen.b < 0)
-                        pen.b = 0;
+                if (pen.r < 0)
+                    pen.r = 0;
+                if (pen.g < 0)
+                    pen.g = 0;
+                if (pen.b < 0)
+                    pen.b = 0;
 
-                    pen.r += .2;
-                    pen.g += .2;
-                    pen.b += .2;
+                pen.r += .2;
+                pen.g += .2;
+                pen.b += .2;
 
-                    pen.a = 100;
-                    pen.lineRadius = 4;
-                    mParticles->emitter(&pos, &angle, speed, spread, num, &pen, timeToLive, true, false, .98, true);
-                }
+                pen.a = 100;
+                pen.lineRadius = 4;
+                mParticles->emitter(&pos, &angle, speed, spread, num, &pen, timeToLive, true, false, .98, true);
             }
         }
     }
@@ -603,8 +544,6 @@ void game::draw(int pass)
             } else {
                 mPlayers->draw();
             }
-        } else if (mGameMode == GAMEMODE_CHOOSE_GAMETYPE) {
-            menuSelectGameType::draw();
         }
 
         // Stars
@@ -658,24 +597,9 @@ void game::startGame(GameType gameType)
 
     mSpawner->init();
 
-    // Fire up the players
+    // Fire up player 1
     if (getPlayer1()->mJoined) {
         getPlayer1()->initPlayerForGame();
-    }
-    if (getPlayer2()->mJoined) {
-        getPlayer2()->initPlayerForGame();
-    }
-    if (getPlayer3()->mJoined) {
-        getPlayer3()->initPlayerForGame();
-    }
-    if (getPlayer4()->mJoined) {
-        getPlayer4()->initPlayerForGame();
-    }
-
-    if (numPlayers() > 1) {
-        // Shared lives and bombs
-        m2PlayerNumLives = 10;
-        m2PlayerNumBombs = 0;
     }
 
     mGameMode = GAMEMODE_PLAYING;
@@ -706,16 +630,10 @@ void game::endGame()
     mSound->playTrack(SOUNDID_PLAYERDEAD);
     mSound->playTrack(SOUNDID_MENU_MUSICLOOP);
 
-    // Kill all players
+    // Kill player
     getPlayer1()->setState(entity::ENTITY_STATE_INACTIVE);
-    getPlayer2()->setState(entity::ENTITY_STATE_INACTIVE);
-    getPlayer3()->setState(entity::ENTITY_STATE_INACTIVE);
-    getPlayer4()->setState(entity::ENTITY_STATE_INACTIVE);
 
     getPlayer1()->deinitPlayerForGame();
-    getPlayer2()->deinitPlayerForGame();
-    getPlayer3()->deinitPlayerForGame();
-    getPlayer4()->deinitPlayerForGame();
 
     // Kill all enemies
     mEnemies->disableAllEnemies();
@@ -786,25 +704,7 @@ void game::clearPointDisplays()
 
 int game::numPlayers() const
 {
-    int numPlayers = 0;
-
-    if (getPlayer1()->mJoined) {
-        ++numPlayers;
-    }
-    if (getPlayer2()->mJoined) {
-        ++numPlayers;
-    }
-    if (getPlayer3()->mJoined) {
-        ++numPlayers;
-    }
-    if (getPlayer4()->mJoined) {
-        ++numPlayers;
-    }
-
-    return numPlayers;
+    return getPlayer1()->mJoined ? 1 : 0;
 }
 
 player* game::getPlayer1() const { return mPlayers->getPlayer1(); }
-player* game::getPlayer2() const { return mPlayers->getPlayer2(); }
-player* game::getPlayer3() const { return mPlayers->getPlayer3(); }
-player* game::getPlayer4() const { return mPlayers->getPlayer4(); }

@@ -302,11 +302,7 @@ void entityBlackHole::hit(entity* aEntity)
                     if (mPoints) {
                         Point3d pos = getPos();
 
-                        // Add points and display them at the destruction point
-                        if (missile->mPlayerSource == 0)
-                            mGame.getPlayer1()->addKillAtLocation(mPoints, pos);
-                        else if (missile->mPlayerSource == 1)
-                            mGame.getPlayer2()->addKillAtLocation(mPoints, pos);
+                        mGame.getPlayer1()->addKillAtLocation(mPoints, pos);
                     }
                 }
             }
