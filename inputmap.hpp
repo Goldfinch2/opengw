@@ -18,6 +18,7 @@ enum class GameAction {
     START_P1, START_P2, START_P3, START_P4,
     BACK,
     PAUSE,
+    EXIT,
     COUNT
 };
 

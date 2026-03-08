@@ -184,6 +184,14 @@ bool controls::getPauseButton(int player)
     return readKeyboardPause(player) || readGamepadPause(player);
 }
 
+bool controls::getExitButton()
+{
+    if (mInputMap)
+        return mInputMap->isActive(GameAction::EXIT);
+    const bool* keystate = SDL_GetKeyboardState(nullptr);
+    return keystate && keystate[SDL_SCANCODE_ESCAPE];
+}
+
 //
 // Keyboard controller
 //

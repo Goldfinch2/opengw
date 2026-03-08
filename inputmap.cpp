@@ -163,6 +163,7 @@ void InputMap::setDefaults() {
 
     addKey(GameAction::BACK,       SDL_SCANCODE_5);
     addKey(GameAction::PAUSE,      SDL_SCANCODE_P);
+    addKey(GameAction::EXIT,       SDL_SCANCODE_ESCAPE);
 }
 
 // ---------------------------------------------------------------------------
@@ -194,6 +195,7 @@ void InputMap::parseLine(const std::string& line) {
     else if (actionName == "start4")     action = GameAction::START_P4;
     else if (actionName == "coin1")      action = GameAction::BACK;
     else if (actionName == "ui_pause")   action = GameAction::PAUSE;
+    else if (actionName == "ui_cancel")  action = GameAction::EXIT;
     else return;
 
     int idx = static_cast<int>(action);

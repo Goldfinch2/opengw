@@ -148,8 +148,6 @@ static bool handleEvents()
         case SDL_EVENT_QUIT:
             return false;
         case SDL_EVENT_KEY_DOWN:
-            if (e.key.scancode == SDL_SCANCODE_ESCAPE)
-                return false;
             break;
 #if !defined(USE_DVG_RENDERER)
         case SDL_EVENT_WINDOW_RESIZED:
@@ -166,6 +164,10 @@ static bool handleEvents()
     }
 
     keyboardState = SDL_GetKeyboardState(nullptr);
+
+    if (theGame->mControls->getExitButton())
+        return false;
+
     return true;
 }
 

@@ -19,6 +19,7 @@ class controls
     bool getStartButton(int player);
     bool getBackButton(int player);
     bool getPauseButton(int player);
+    bool getExitButton();
 
     // Hot-plugging support
     void handleGamepadAdded(SDL_JoystickID instanceId);
