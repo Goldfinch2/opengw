@@ -2,6 +2,11 @@
 
 #include <string>
 
+// Marquee display mode constants
+static constexpr int MARQUEE_MODE_FIT     = 0;
+static constexpr int MARQUEE_MODE_STRETCH = 1;
+static constexpr int MARQUEE_MODE_ZOOM    = 2;
+
 class settings
 {
   public:
@@ -9,6 +14,9 @@ class settings
     ~settings() = default;
 
     const static settings& get();
+
+    int marqueeDisplayMode;
+    int getMarqueeDisplayMode() const { return marqueeDisplayMode; }
 
     bool mCreditsPerGame;
 

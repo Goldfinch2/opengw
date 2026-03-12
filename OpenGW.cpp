@@ -103,20 +103,44 @@ static void dvgShowMarquee()
     int winW, winH;
     SDL_GetWindowSize(window, &winW, &winH);
 
+    const int mode = settings::get().getMarqueeDisplayMode();
+
     float scaleX = (float)winW / (float)w;
     float scaleY = (float)winH / (float)h;
-    float scale  = (scaleX < scaleY) ? scaleX : scaleY;
 
-    float dstW = (float)w * scale;
-    float dstH = (float)h * scale;
-    SDL_FRect dst = { ((float)winW - dstW) / 2.0f, ((float)winH - dstH) / 2.0f, dstW, dstH };
+    SDL_FRect* srcPtr = nullptr;
+    SDL_FRect srcRect;
+    SDL_FRect dst;
+
+    if (mode == MARQUEE_MODE_STRETCH)
+    {
+        // Fill entire window, ignore aspect ratio
+        dst = { 0.0f, 0.0f, (float)winW, (float)winH };
+    }
+    else if (mode == MARQUEE_MODE_ZOOM)
+    {
+        // Fill entire window, preserve aspect ratio, crop excess
+        float scale = (scaleX > scaleY) ? scaleX : scaleY;
+        float visW = (float)winW / scale;
+        float visH = (float)winH / scale;
+        srcRect = { ((float)w - visW) / 2.0f, ((float)h - visH) / 2.0f, visW, visH };
+        srcPtr = &srcRect;
+        dst = { 0.0f, 0.0f, (float)winW, (float)winH };
+    }
+    else // MARQUEE_MODE_FIT (default)
+    {
+        float scale = (scaleX < scaleY) ? scaleX : scaleY;
+        float dstW = (float)w * scale;
+        float dstH = (float)h * scale;
+        dst = { ((float)winW - dstW) / 2.0f, ((float)winH - dstH) / 2.0f, dstW, dstH };
+    }
 
     // Render twice for kmsdrm double-buffering
     for (int i = 0; i < 2; i++)
     {
         SDL_SetRenderDrawColor(g_dvgRenderer, 0, 0, 0, 255);
         SDL_RenderClear(g_dvgRenderer);
-        SDL_RenderTexture(g_dvgRenderer, g_marqueeTexture, nullptr, &dst);
+        SDL_RenderTexture(g_dvgRenderer, g_marqueeTexture, srcPtr, &dst);
         SDL_RenderPresent(g_dvgRenderer);
     }
 
@@ -232,6 +256,8 @@ int main(int /*argc*/, char** /*argv*/)
         debuglog::log(true, "No display server, using kmsdrm video driver\n");
     }
 
+    SDL_HideCursor();
+
     // Detect display resolution
     int displayWidth = 800;
     int displayHeight = 600;
@@ -251,7 +277,6 @@ int main(int /*argc*/, char** /*argv*/)
                               displayWidth, displayHeight, flags);
 
     if (window) {
-        SDL_HideCursor();
         srand(SDL_GetTicks());
         make_sin_cos_tables();
         g_scene.init();
@@ -483,6 +508,8 @@ int main(int /*argc*/, char** /*argv*/)
         debuglog::log(true, "No display server, using kmsdrm video driver\n");
     }
 
+    SDL_HideCursor();
+
     // Detect display resolution (used for aspect ratio calculation)
     mWidth = 800;
     mHeight = 600;
@@ -505,7 +532,6 @@ int main(int /*argc*/, char** /*argv*/)
         SDL_Quit();
         return 1;
     }
-    SDL_HideCursor();
 
     // Create SDL renderer for marquee display on the Pi's screen
     g_dvgRenderer = SDL_CreateRenderer(window, nullptr);

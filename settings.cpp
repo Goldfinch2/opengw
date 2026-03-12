@@ -34,6 +34,7 @@ settings::settings()
 
     serialPort[0] = '\0';
     sortVectors = true;
+    marqueeDisplayMode = MARQUEE_MODE_FIT;
 
     marquee[0] = '\0';
     advmamerc[0] = '\0';
@@ -191,7 +192,21 @@ void settings::load()
                         serialPort[sizeof(serialPort) - 1] = '\0';
                         debuglog::log(true, "Serial port from %s: %s\n", rcPath, serialPort);
                     }
-                    break;
+                }
+
+                if (strncmp(rcLine, "vector_aux_marquee_display_mode", 31) == 0 &&
+                    (rcLine[31] == ' ' || rcLine[31] == 0))
+                {
+                    char* val = rcLine + 31;
+                    while (*val == ' ') val++;
+                    if (strcmp(val, "stretch") == 0)
+                        marqueeDisplayMode = MARQUEE_MODE_STRETCH;
+                    else if (strcmp(val, "zoom") == 0)
+                        marqueeDisplayMode = MARQUEE_MODE_ZOOM;
+                    else
+                        marqueeDisplayMode = MARQUEE_MODE_FIT;
+                    debuglog::log(true, "Marquee display mode from %s: %s (%d)\n",
+                                  rcPath, val, marqueeDisplayMode);
                 }
             }
             fclose(rc);
