@@ -151,6 +151,8 @@ game::game()
         mAttractModeBlackHoles[i]->setDrift(speedVector);
     }
 
+    mLeds.init();
+
     mGameMode = GAMEMODE_ATTRACT;
 
     mSound->playTrack(SOUNDID_MENU_MUSICLOOP);
@@ -451,6 +453,19 @@ void game::run()
                 mParticles->emitter(&pos, &angle, speed, spread, num, &pen, timeToLive, true, false, .98, true);
             }
         }
+    }
+
+    // Keyboard LED feedback
+    if (mGameMode == GAMEMODE_CREDITED) {
+        // Blink SCROLLLOCK while waiting for start
+        ++mLedBlinkTimer;
+        if (mLedBlinkTimer >= 30) mLedBlinkTimer = 0;
+        mLeds.set(mLedBlinkTimer < 15 ? KeyboardLeds::SCROLLLOCK : 0);
+    } else if (mGameMode == GAMEMODE_PLAYING) {
+        mLeds.set(KeyboardLeds::SCROLLLOCK);
+    } else {
+        mLedBlinkTimer = 0;
+        mLeds.set(0);
     }
 
     mGrid->run();

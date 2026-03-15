@@ -1,5 +1,6 @@
 #pragma once
 
+#include "keyboard_leds.h"
 #include "point3d.hpp"
 #include "sound.hpp"
 #include "vector.hpp"
@@ -172,6 +173,9 @@ class game
     float mBrightness;
 
     bool mDebounce { false };
+
+    KeyboardLeds mLeds;
+    int mLedBlinkTimer { 0 };
 
     std::unique_ptr<entity> mAttractModeBlackHoles[4];
 };

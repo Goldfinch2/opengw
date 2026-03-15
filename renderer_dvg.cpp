@@ -112,9 +112,7 @@ static bool worldToDvg(float wx, float wy, int32_t* outX, int32_t* outY)
 
     if (g_verticalDisplay)
     {
-        int32_t tmp = *outX;
-        *outX = DVG_RES_MAX - *outY;
-        *outY = tmp;
+        // Horizontal game on vertical display: letterbox Y to 75% and center
         *outY = 512 + (int32_t)(0.75f * *outY);
     }
 
@@ -266,9 +264,9 @@ static void addWorldLine(float x0, float y0, float x1, float y1,
 
 
         if (g_verticalDisplay) {
-            int32_t tmp;
-            tmp = dx0; dx0 = DVG_RES_MAX - dy0; dy0 = 512 + (int32_t)(0.75f * tmp);
-            tmp = dx1; dx1 = DVG_RES_MAX - dy1; dy1 = 512 + (int32_t)(0.75f * tmp);
+            // Horizontal game on vertical display: letterbox Y to 75% and center
+            dy0 = 512 + (int32_t)(0.75f * dy0);
+            dy1 = 512 + (int32_t)(0.75f * dy1);
         }
     } else {
         if (!worldToDvg(x0, y0, &dx0, &dy0)) return;
