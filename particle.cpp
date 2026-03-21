@@ -15,7 +15,7 @@
 #include <cstdio>
 //#include <mutex>
 
-#include <SDL3/SDL.h>
+#include <SDL2/SDL.h>
 
 static SDL_Thread* mRunThread = nullptr;
 static std::atomic_bool mRunFlag { false };

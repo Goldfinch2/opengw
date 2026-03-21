@@ -7,14 +7,15 @@
 #   make -f makefile.linux clean
 
 CXX = g++
+DVG_UTILS = ../dvg_utils
 
-CXXFLAGS_COMMON = -std=c++20 -Wall -Wextra -O3 -ggdb -I. -I/usr/local/include
+CXXFLAGS_COMMON = -std=c++20 -Wall -Wextra -O3 -ggdb -I. -I/usr/local/include -I$(DVG_UTILS)
 
 CXXFLAGS_SDL = $(CXXFLAGS_COMMON)
 CXXFLAGS_DVG = $(CXXFLAGS_COMMON) -DUSE_DVG_RENDERER
 
-LIBS_SDL = -lSDL3 -lGL -lGLU
-LIBS_DVG = -lSDL3
+LIBS_SDL = -lSDL2 -lGL -lGLU
+LIBS_DVG = -lSDL2
 
 ALL_SRC = $(wildcard *.cpp)
 SRC_FILES = $(notdir $(ALL_SRC))
@@ -22,8 +23,8 @@ SRC_FILES = $(notdir $(ALL_SRC))
 OBJDIR_SDL = obj_sdl
 OBJDIR_DVG = obj_dvg
 
-OBJS_SDL = $(patsubst %.cpp,$(OBJDIR_SDL)/%.o,$(SRC_FILES))
-OBJS_DVG = $(patsubst %.cpp,$(OBJDIR_DVG)/%.o,$(SRC_FILES))
+OBJS_SDL = $(patsubst %.cpp,$(OBJDIR_SDL)/%.o,$(SRC_FILES)) $(OBJDIR_SDL)/advmame_rc.o $(OBJDIR_SDL)/cfg_file.o
+OBJS_DVG = $(patsubst %.cpp,$(OBJDIR_DVG)/%.o,$(SRC_FILES)) $(OBJDIR_DVG)/advmame_rc.o $(OBJDIR_DVG)/cfg_file.o $(OBJDIR_DVG)/dvg_cmd.o $(OBJDIR_DVG)/dvg_serial_linux.o
 
 DEPS_SDL = $(OBJS_SDL:.o=.d)
 DEPS_DVG = $(OBJS_DVG:.o=.d)
@@ -53,12 +54,30 @@ $(OBJDIR_SDL)/%.d: %.cpp | $(OBJDIR_SDL)
 $(OBJDIR_SDL)/%.o: %.cpp
 	$(CXX) $(CXXFLAGS_SDL) -c $< -o $@
 
+$(OBJDIR_SDL)/advmame_rc.o: $(DVG_UTILS)/advmame_rc.cpp | $(OBJDIR_SDL)
+	$(CXX) $(CXXFLAGS_SDL) -c $< -o $@
+
+$(OBJDIR_SDL)/cfg_file.o: $(DVG_UTILS)/cfg_file.cpp | $(OBJDIR_SDL)
+	$(CXX) $(CXXFLAGS_SDL) -I$(DVG_UTILS) -c $< -o $@
+
 # DVG build
 $(OBJDIR_DVG)/%.d: %.cpp | $(OBJDIR_DVG)
 	$(CXX) -MM -MP -MT $(@:.d=.o) -o $@ $< $(CXXFLAGS_DVG)
 
 $(OBJDIR_DVG)/%.o: %.cpp
 	$(CXX) $(CXXFLAGS_DVG) -c $< -o $@
+
+$(OBJDIR_DVG)/advmame_rc.o: $(DVG_UTILS)/advmame_rc.cpp | $(OBJDIR_DVG)
+	$(CXX) $(CXXFLAGS_DVG) -c $< -o $@
+
+$(OBJDIR_DVG)/cfg_file.o: $(DVG_UTILS)/cfg_file.cpp | $(OBJDIR_DVG)
+	$(CXX) $(CXXFLAGS_DVG) -I$(DVG_UTILS) -c $< -o $@
+
+$(OBJDIR_DVG)/dvg_cmd.o: $(DVG_UTILS)/dvg_cmd.cpp | $(OBJDIR_DVG)
+	$(CXX) $(CXXFLAGS_DVG) -I$(DVG_UTILS) -c $< -o $@
+
+$(OBJDIR_DVG)/dvg_serial_linux.o: $(DVG_UTILS)/dvg_serial_linux.cpp | $(OBJDIR_DVG)
+	$(CXX) $(CXXFLAGS_DVG) -I$(DVG_UTILS) -c $< -o $@
 
 PREFIX = /usr/local/share/advance
 

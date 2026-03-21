@@ -2,7 +2,7 @@
 
 #include <string>
 #include <vector>
-#include <SDL3/SDL.h>
+#include <SDL2/SDL.h>
 
 struct InputBinding {
     enum Type { NONE, KEYBOARD, JOY_BUTTON, JOY_AXIS_POS, JOY_AXIS_NEG, MOUSE_BUTTON };
@@ -42,6 +42,4 @@ class InputMap {
     int m_numJoysticks = 0;
 
     void setDefaults();
-    void parseLine(const std::string& line);
-    static SDL_Scancode advmameKeyToSDL(const std::string& keyName);
 };

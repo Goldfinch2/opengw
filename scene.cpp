@@ -9,7 +9,7 @@
 #include "settings.hpp"
 
 #if !defined(USE_DVG_RENDERER)
-#include <SDL3/SDL_opengl.h>
+#include <SDL2/SDL_opengl.h>
 #ifdef __APPLE__
 #include <OpenGL/glu.h>
 #else

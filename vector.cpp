@@ -3,7 +3,7 @@
 #include "vector.hpp"
 #include "mathutils.hpp"
 
-#include <SDL3/SDL_opengl.h>
+#include <SDL2/SDL_opengl.h>
 
 static const float thicknessConstant = .0165f;
 

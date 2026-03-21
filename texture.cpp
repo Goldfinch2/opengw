@@ -18,7 +18,7 @@ texture::~texture(void)
 
 #include "lodepng.h"
 
-#include <SDL3/SDL_opengl.h>
+#include <SDL2/SDL_opengl.h>
 
 void texture::load(const char* filename)
 {

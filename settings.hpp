@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include "cfg_file.h"
+#include "advmame_rc.h"
 
 // Marquee display mode constants
 static constexpr int MARQUEE_MODE_FIT     = 0;

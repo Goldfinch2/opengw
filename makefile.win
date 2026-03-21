@@ -1,5 +1,5 @@
 # NOTE: this makefile hasn't been tested recently
-LIBS = -LC:\SDK\lib -lmingw32 -lSDL3 -lopengl32 -lglu32
+LIBS = -LC:\SDK\lib -lmingw32 -lSDL2 -lopengl32 -lglu32
 OWN_PATHS = -I.
 HEADERS = -mwindows $(OWN_PATHS) -IC:\SDK\include
 DEFINES =

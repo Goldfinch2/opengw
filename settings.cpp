@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <string>
 
 static std::unique_ptr<settings> instance;
 
@@ -56,164 +57,79 @@ settings::settings()
     load();
 }
 
-// Returns true if the key was handled
-static bool applyKey(settings& s, const char* key, const char* value)
-{
-    if (strcmp(key, "enable_glow") == 0)
-        s.mEnableGlow = (strcmp(value, "true") == 0);
-    else if (strcmp(key, "grid_smoothing") == 0)
-        s.mGridSmoothing = (strcmp(value, "true") == 0);
-    else if (strcmp(key, "particle_smoothing") == 0)
-        s.mParticleSmoothing = (strcmp(value, "true") == 0);
-    else if (strcmp(key, "enemy_smoothing") == 0)
-        s.mEnemySmoothing = (strcmp(value, "true") == 0);
-    else if (strcmp(key, "player_smoothing") == 0)
-        s.mPlayerSmoothing = (strcmp(value, "true") == 0);
-    else if (strcmp(key, "star_smoothing") == 0)
-        s.mStarSmoothing = (strcmp(value, "true") == 0);
-    else if (strcmp(key, "attractors") == 0)
-        s.mAttractors = atoi(value);
-    else if (strcmp(key, "particles") == 0)
-        s.mParticles = atoi(value);
-    else if (strcmp(key, "grid_passes") == 0)
-        s.mGridPasses = atoi(value);
-    else if (strcmp(key, "grid_spacing") == 0)
-        s.gridSpacing = atoi(value);
-    else if (strcmp(key, "credits_per_game") == 0)
-        s.mCreditsPerGame = (strcmp(value, "true") == 0);
-    else if (strcmp(key, "target_fps") == 0)
-        s.targetFps = atoi(value);
-    else if (strcmp(key, "sort_vectors") == 0)
-        s.sortVectors = (strcmp(value, "true") == 0);
-    else if (strcmp(key, "dvg_refresh_rate") == 0)
-        s.dvgRefreshRate = atoi(value);
-    else if (strcmp(key, "marquee") == 0) {
-        strncpy(s.marquee, value, sizeof(s.marquee) - 1);
-        s.marquee[sizeof(s.marquee) - 1] = '\0';
-    }
-    else if (strcmp(key, "advmamerc") == 0) {
-        strncpy(s.advmamerc, value, sizeof(s.advmamerc) - 1);
-        s.advmamerc[sizeof(s.advmamerc) - 1] = '\0';
-    }
-    else if (strcmp(key, "sounds") == 0) {
-        strncpy(s.sounds, value, sizeof(s.sounds) - 1);
-        s.sounds[sizeof(s.sounds) - 1] = '\0';
-    }
-    else if (strcmp(key, "save") == 0) {
-        strncpy(s.save, value, sizeof(s.save) - 1);
-        s.save[sizeof(s.save) - 1] = '\0';
-    }
-    else
-        return false;
+// Helper: read from build-specific section first, fall back to global
+static std::string cfgGet(const CfgFile& cfg, const std::string& sec, const std::string& key, const std::string& def) {
+    if (cfg.hasKey(sec, key)) return cfg.getString(sec, key, def);
+    return cfg.getString("", key, def);
+}
+static int cfgGetI(const CfgFile& cfg, const std::string& sec, const std::string& key, int def) {
+    if (cfg.hasKey(sec, key)) return cfg.getInt(sec, key, def);
+    return cfg.getInt("", key, def);
+}
+static bool cfgGetB(const CfgFile& cfg, const std::string& sec, const std::string& key, bool def) {
+    if (cfg.hasKey(sec, key)) return cfg.getBool(sec, key, def);
+    return cfg.getBool("", key, def);
+}
 
-    return true;
+static void cfgCopyStr(const CfgFile& cfg, const std::string& sec, const std::string& key, char* dst, size_t dstSize) {
+    std::string val = cfgGet(cfg, sec, key, "");
+    if (!val.empty()) snprintf(dst, dstSize, "%s", val.c_str());
 }
 
 void settings::load()
 {
-    FILE* file = fopen("opengw.cfg", "r");
-    if (!file) {
-        debuglog::log(true,"opengw.cfg not found, using defaults\n");
+    CfgFile cfg;
+    if (!cfg.load("opengw.cfg")) {
+        debuglog::log(true, "opengw.cfg not found, using defaults\n");
         return;
     }
 
     debuglog::log(true, "Loading opengw.cfg\n");
 
-    // Section tracking: 0 = global (applies to all), 1 = sdl, 2 = dvg
-    enum Section { SECTION_GLOBAL, SECTION_SDL, SECTION_DVG };
-    Section section = SECTION_GLOBAL;
-
 #if defined(USE_DVG_RENDERER)
-    const Section mySection = SECTION_DVG;
+    const std::string sec = "dvg";
 #else
-    const Section mySection = SECTION_SDL;
+    const std::string sec = "sdl";
 #endif
 
-    char buffer[256];
-    while (fgets(buffer, sizeof(buffer), file)) {
-        int len = (int)strlen(buffer);
-        if (len > 0 && buffer[len - 1] == '\n')
-            buffer[--len] = 0;
-        if (len > 0 && buffer[len - 1] == '\r')
-            buffer[--len] = 0;
+    mEnableGlow        = cfgGetB(cfg, sec, "enable_glow",        mEnableGlow);
+    mGridSmoothing     = cfgGetB(cfg, sec, "grid_smoothing",     mGridSmoothing);
+    mParticleSmoothing = cfgGetB(cfg, sec, "particle_smoothing", mParticleSmoothing);
+    mEnemySmoothing    = cfgGetB(cfg, sec, "enemy_smoothing",    mEnemySmoothing);
+    mPlayerSmoothing   = cfgGetB(cfg, sec, "player_smoothing",   mPlayerSmoothing);
+    mStarSmoothing     = cfgGetB(cfg, sec, "star_smoothing",     mStarSmoothing);
+    mAttractors        = cfgGetI(cfg, sec, "attractors",         mAttractors);
+    mParticles         = cfgGetI(cfg, sec, "particles",          mParticles);
+    mGridPasses        = cfgGetI(cfg, sec, "grid_passes",        mGridPasses);
+    gridSpacing        = cfgGetI(cfg, sec, "grid_spacing",       gridSpacing);
+    mCreditsPerGame    = cfgGetB(cfg, sec, "credits_per_game",   mCreditsPerGame);
+    targetFps          = cfgGetI(cfg, sec, "target_fps",         targetFps);
+    sortVectors        = cfgGetB(cfg, sec, "sort_vectors",       sortVectors);
+    dvgRefreshRate     = cfgGetI(cfg, sec, "dvg_refresh_rate",   dvgRefreshRate);
 
-        if (strlen(buffer) == 0 || buffer[0] == '#')
-            continue;
-
-        // Section headers
-        if (buffer[0] == '[') {
-            if (strcmp(buffer, "[sdl]") == 0)
-                section = SECTION_SDL;
-            else if (strcmp(buffer, "[dvg]") == 0)
-                section = SECTION_DVG;
-            else
-                debuglog::log(true,"settings: unknown section '%s'\n", buffer);
-            continue;
-        }
-
-        // Skip keys that belong to the other build's section
-        if (section != SECTION_GLOBAL && section != mySection)
-            continue;
-
-        char* key = strtok(buffer, " ");
-        if (!key) continue;
-
-        char* value = strtok(nullptr, " ");
-        if (!value) continue;
-
-        if (!applyKey(*this, key, value))
-            debuglog::log(true,"settings: unknown key '%s'\n", key);
-    }
-
-    fclose(file);
+    cfgCopyStr(cfg, sec, "marquee",   marquee,   sizeof(marquee));
+    cfgCopyStr(cfg, sec, "advmamerc", advmamerc, sizeof(advmamerc));
+    cfgCopyStr(cfg, sec, "sounds",    sounds,    sizeof(sounds));
+    cfgCopyStr(cfg, sec, "save",      save,      sizeof(save));
 
 #if defined(USE_DVG_RENDERER)
-    // Read serial port from advmame.rc (vector_aux_renderer_port)
+    // Read serial port and display mode from advmame.rc
     {
         const char* rcPath = advmamerc[0] ? advmamerc : "/home/pi/.advance/advmame.rc";
-        FILE* rc = fopen(rcPath, "r");
-        if (rc)
-        {
-            char rcLine[1024];
-            while (fgets(rcLine, sizeof(rcLine), rc))
-            {
-                int rcLen = (int)strlen(rcLine);
-                while (rcLen > 0 && (rcLine[rcLen - 1] == '\n' || rcLine[rcLen - 1] == '\r'))
-                    rcLine[--rcLen] = 0;
-
-                if (strncmp(rcLine, "vector_aux_renderer_port", 24) == 0 &&
-                    (rcLine[24] == ' ' || rcLine[24] == 0))
-                {
-                    char* val = rcLine + 24;
-                    while (*val == ' ') val++;
-                    if (*val && strcmp(val, "auto") != 0)
-                    {
-                        strncpy(serialPort, val, sizeof(serialPort) - 1);
-                        serialPort[sizeof(serialPort) - 1] = '\0';
-                        debuglog::log(true, "Serial port from %s: %s\n", rcPath, serialPort);
-                    }
-                }
-
-                if (strncmp(rcLine, "vector_aux_marquee_display_mode", 31) == 0 &&
-                    (rcLine[31] == ' ' || rcLine[31] == 0))
-                {
-                    char* val = rcLine + 31;
-                    while (*val == ' ') val++;
-                    if (strcmp(val, "stretch") == 0)
-                        marqueeDisplayMode = MARQUEE_MODE_STRETCH;
-                    else if (strcmp(val, "zoom") == 0)
-                        marqueeDisplayMode = MARQUEE_MODE_ZOOM;
-                    else
-                        marqueeDisplayMode = MARQUEE_MODE_FIT;
-                    debuglog::log(true, "Marquee display mode from %s: %s (%d)\n",
-                                  rcPath, val, marqueeDisplayMode);
-                }
+        AdvmameRC rc;
+        if (advmameLoad(rcPath, rc)) {
+            if (!rc.config.rendererPort.empty()) {
+                strncpy(serialPort, rc.config.rendererPort.c_str(), sizeof(serialPort) - 1);
+                serialPort[sizeof(serialPort) - 1] = '\0';
+                debuglog::log(true, "Serial port from %s: %s\n", rcPath, serialPort);
             }
-            fclose(rc);
-        }
-        else
-        {
-            debuglog::log(true, "Could not open %s for serial port\n", rcPath);
+            if (rc.config.marqueeDisplayMode == "stretch")
+                marqueeDisplayMode = MARQUEE_MODE_STRETCH;
+            else if (rc.config.marqueeDisplayMode == "zoom")
+                marqueeDisplayMode = MARQUEE_MODE_ZOOM;
+            else
+                marqueeDisplayMode = MARQUEE_MODE_FIT;
+            debuglog::log(true, "Marquee display mode: %d\n", marqueeDisplayMode);
         }
     }
 #endif

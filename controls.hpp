@@ -3,7 +3,7 @@
 #include "inputmap.hpp"
 #include "point3d.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL2/SDL.h>
 
 #include <memory>
 
@@ -45,7 +45,7 @@ class controls
 
     static constexpr int MAX_GAMEPADS { 4 };
 
-    SDL_Gamepad* mGamepads[MAX_GAMEPADS] {};
+    SDL_GameController* mGamepads[MAX_GAMEPADS] {};
     int mNumGamepads { 0 };
 
     // advmame.rc input mapping (used when configured, replaces keyboard/gamepad)

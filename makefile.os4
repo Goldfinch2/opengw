@@ -1,4 +1,4 @@
-LIBS = -lSDL3
+LIBS = -lSDL2
 OWN_PATHS = -I.
 HEADERS = $(OWN_PATHS) -I/SDK/local/newlib/include
 DEFINES =

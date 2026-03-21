@@ -5,7 +5,7 @@
 #include "settings.hpp"
 #include "sincos.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL2/SDL.h>
 
 #include <cstdio>
 #include <memory>
@@ -13,12 +13,12 @@
 // Shared globals
 static SDL_Window* window;
 static int mWidth, mHeight;
-const bool* keyboardState;
+const Uint8* keyboardState;
 
 #if !defined(USE_DVG_RENDERER)
 #include "blur.hpp"
 
-#include <SDL3/SDL_opengl.h>
+#include <SDL2/SDL_opengl.h>
 
 #ifdef __APPLE__
 #include <OpenGL/glu.h>
@@ -83,16 +83,16 @@ static void dvgShowMarquee()
         return;
     }
 
-    SDL_Surface* surface = SDL_CreateSurfaceFrom(
-        (int)w, (int)h, SDL_PIXELFORMAT_RGBA32, image.data(), (int)(w * 4));
+    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormatFrom(
+        image.data(), (int)w, (int)h, 32, (int)(w * 4), SDL_PIXELFORMAT_RGBA32);
     if (!surface)
     {
-        debuglog::log(true, "Marquee: SDL_CreateSurfaceFrom failed: %s\n", SDL_GetError());
+        debuglog::log(true, "Marquee: SDL_CreateRGBSurfaceWithFormatFrom failed: %s\n", SDL_GetError());
         return;
     }
 
     g_marqueeTexture = SDL_CreateTextureFromSurface(g_dvgRenderer, surface);
-    SDL_DestroySurface(surface);
+    SDL_FreeSurface(surface);
 
     if (!g_marqueeTexture)
     {
@@ -108,14 +108,14 @@ static void dvgShowMarquee()
     float scaleX = (float)winW / (float)w;
     float scaleY = (float)winH / (float)h;
 
-    SDL_FRect* srcPtr = nullptr;
-    SDL_FRect srcRect;
-    SDL_FRect dst;
+    SDL_Rect* srcPtr = nullptr;
+    SDL_Rect srcRect;
+    SDL_Rect dst;
 
     if (mode == MARQUEE_MODE_STRETCH)
     {
         // Fill entire window, ignore aspect ratio
-        dst = { 0.0f, 0.0f, (float)winW, (float)winH };
+        dst = { 0, 0, winW, winH };
     }
     else if (mode == MARQUEE_MODE_ZOOM)
     {
@@ -123,16 +123,16 @@ static void dvgShowMarquee()
         float scale = (scaleX > scaleY) ? scaleX : scaleY;
         float visW = (float)winW / scale;
         float visH = (float)winH / scale;
-        srcRect = { ((float)w - visW) / 2.0f, ((float)h - visH) / 2.0f, visW, visH };
+        srcRect = { (int)(((float)w - visW) / 2.0f), (int)(((float)h - visH) / 2.0f), (int)visW, (int)visH };
         srcPtr = &srcRect;
-        dst = { 0.0f, 0.0f, (float)winW, (float)winH };
+        dst = { 0, 0, winW, winH };
     }
     else // MARQUEE_MODE_FIT (default)
     {
         float scale = (scaleX < scaleY) ? scaleX : scaleY;
-        float dstW = (float)w * scale;
-        float dstH = (float)h * scale;
-        dst = { ((float)winW - dstW) / 2.0f, ((float)winH - dstH) / 2.0f, dstW, dstH };
+        int dstW = (int)((float)w * scale);
+        int dstH = (int)((float)h * scale);
+        dst = { (winW - dstW) / 2, (winH - dstH) / 2, dstW, dstH };
     }
 
     // Render twice for kmsdrm double-buffering
@@ -140,7 +140,7 @@ static void dvgShowMarquee()
     {
         SDL_SetRenderDrawColor(g_dvgRenderer, 0, 0, 0, 255);
         SDL_RenderClear(g_dvgRenderer);
-        SDL_RenderTexture(g_dvgRenderer, g_marqueeTexture, srcPtr, &dst);
+        SDL_RenderCopy(g_dvgRenderer, g_marqueeTexture, srcPtr, &dst);
         SDL_RenderPresent(g_dvgRenderer);
     }
 
@@ -169,25 +169,26 @@ static bool handleEvents()
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
         switch (e.type) {
-        case SDL_EVENT_QUIT:
+        case SDL_QUIT:
             return false;
-        case SDL_EVENT_KEY_DOWN:
+        case SDL_KEYDOWN:
             break;
 #if !defined(USE_DVG_RENDERER)
-        case SDL_EVENT_WINDOW_RESIZED:
-            resizeViewport(e.window.data1, e.window.data2);
+        case SDL_WINDOWEVENT:
+            if (e.window.event == SDL_WINDOWEVENT_RESIZED)
+                resizeViewport(e.window.data1, e.window.data2);
             break;
 #endif
-        case SDL_EVENT_GAMEPAD_ADDED:
+        case SDL_CONTROLLERDEVICEADDED:
             theGame->mControls->handleGamepadAdded(e.cdevice.which);
             break;
-        case SDL_EVENT_GAMEPAD_REMOVED:
+        case SDL_CONTROLLERDEVICEREMOVED:
             theGame->mControls->handleGamepadRemoved(e.cdevice.which);
             break;
         }
     }
 
-    keyboardState = SDL_GetKeyboardState(nullptr);
+    keyboardState = SDL_GetKeyboardState(NULL);
 
     if (theGame->mControls->getExitButton())
         return false;
@@ -246,34 +247,34 @@ int main(int /*argc*/, char** /*argv*/)
     debuglog::init();
     debuglog::log(true, "OpenGW SDL\n");
 
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD)) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
         // No display server — try KMSDRM
-        SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "kmsdrm");
-        if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD)) {
+        SDL_SetHint(SDL_HINT_VIDEODRIVER, "kmsdrm");
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
             debuglog::log(true, "SDL_Init failed: %s\n", SDL_GetError());
             return 0;
         }
         debuglog::log(true, "No display server, using kmsdrm video driver\n");
     }
 
-    SDL_HideCursor();
+    SDL_ShowCursor(SDL_DISABLE);
 
     // Detect display resolution
     int displayWidth = 800;
     int displayHeight = 600;
     {
-        SDL_DisplayID displayID = SDL_GetPrimaryDisplay();
-        const SDL_DisplayMode* dm = SDL_GetCurrentDisplayMode(displayID);
-        if (dm) {
-            displayWidth = dm->w;
-            displayHeight = dm->h;
+        SDL_DisplayMode dm;
+        if (SDL_GetCurrentDisplayMode(0, &dm) == 0) {
+            displayWidth = dm.w;
+            displayHeight = dm.h;
             debuglog::log(true, "Display mode: %dx%d\n", displayWidth, displayHeight);
         }
     }
 
-    Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN;
+    Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN_DESKTOP;
 
     window = SDL_CreateWindow("OpenGW",
+                              SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                               displayWidth, displayHeight, flags);
 
     if (window) {
@@ -310,11 +311,11 @@ static void createContext(int width, int height)
     // Do stuff with the context here if needed...
     createOffscreens();
 
-    if (!SDL_GL_SetSwapInterval(0)) {
+    if (SDL_GL_SetSwapInterval(0) != 0) {
         debuglog::log(true, "SDL_GL_SetSwapInterval failed: %s\n", SDL_GetError());
     }
 
-    if (!SDL_GL_MakeCurrent(window, context)) {
+    if (SDL_GL_MakeCurrent(window, context) != 0) {
         debuglog::log(true, "SDL_GL_MakeCurrent failed: %s\n", SDL_GetError());
     }
 
@@ -325,8 +326,8 @@ static void destroyContext()
 {
     oglInited = false;
 
-    SDL_GL_MakeCurrent(nullptr, nullptr);
-    SDL_GL_DestroyContext(context);
+    SDL_GL_MakeCurrent(window, NULL);
+    SDL_GL_DeleteContext(context);
 }
 
 static void resizeViewport(int cx, int cy)
@@ -499,33 +500,34 @@ int main(int /*argc*/, char** /*argv*/)
     debuglog::init();
     debuglog::log(true, "OpenGW DVG\n");
 
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD)) {
-        SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "kmsdrm");
-        if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD)) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
+        SDL_SetHint(SDL_HINT_VIDEODRIVER, "kmsdrm");
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
             debuglog::log(true, "SDL_Init failed: %s\n", SDL_GetError());
             return 1;
         }
         debuglog::log(true, "No display server, using kmsdrm video driver\n");
     }
 
-    SDL_HideCursor();
+    SDL_ShowCursor(SDL_DISABLE);
 
     // Detect display resolution (used for aspect ratio calculation)
     mWidth = 800;
     mHeight = 600;
     {
-        SDL_DisplayID displayID = SDL_GetPrimaryDisplay();
-        const SDL_DisplayMode* dm = SDL_GetCurrentDisplayMode(displayID);
-        if (dm) {
-            mWidth = dm->w;
-            mHeight = dm->h;
+        SDL_DisplayMode dm;
+        if (SDL_GetCurrentDisplayMode(0, &dm) == 0) {
+            mWidth = dm.w;
+            mHeight = dm.h;
             debuglog::log(true, "Display: %dx%d\n", mWidth, mHeight);
         }
     }
 
     // Create a minimal window (needed for SDL event loop and gamepad)
-    window = SDL_CreateWindow("OpenGW DVG", mWidth, mHeight,
-                                          SDL_WINDOW_FULLSCREEN);
+    window = SDL_CreateWindow("OpenGW DVG",
+                              SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+                              mWidth, mHeight,
+                              SDL_WINDOW_FULLSCREEN_DESKTOP);
     if (!window) {
         debuglog::log(true, "Failed to create window: %s\n", SDL_GetError());
         debuglog::close();
@@ -534,7 +536,7 @@ int main(int /*argc*/, char** /*argv*/)
     }
 
     // Create SDL renderer for marquee display on the Pi's screen
-    g_dvgRenderer = SDL_CreateRenderer(window, nullptr);
+    g_dvgRenderer = SDL_CreateRenderer(window, -1, 0);
     if (g_dvgRenderer)
         dvgShowMarquee();
     else
