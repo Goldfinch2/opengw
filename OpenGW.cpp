@@ -188,6 +188,7 @@ static bool handleEvents()
         }
     }
 
+    SDL_JoystickUpdate();
     keyboardState = SDL_GetKeyboardState(NULL);
 
     if (theGame->mControls->getExitButton())

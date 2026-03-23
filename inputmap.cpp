@@ -133,6 +133,8 @@ bool InputMap::load(const char* advmameRcPath) {
 // Joystick management
 // ---------------------------------------------------------------------------
 void InputMap::openJoysticks() {
+    SDL_JoystickEventState(SDL_IGNORE);
+
     int count = SDL_NumJoysticks();
 
     for (int i = 0; i < count && m_numJoysticks < MAX_JOYSTICKS; i++) {
