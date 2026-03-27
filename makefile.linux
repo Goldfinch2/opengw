@@ -23,8 +23,8 @@ SRC_FILES = $(notdir $(ALL_SRC))
 OBJDIR_SDL = obj_sdl
 OBJDIR_DVG = obj_dvg
 
-OBJS_SDL = $(patsubst %.cpp,$(OBJDIR_SDL)/%.o,$(SRC_FILES)) $(OBJDIR_SDL)/advmame_rc.o $(OBJDIR_SDL)/cfg_file.o
-OBJS_DVG = $(patsubst %.cpp,$(OBJDIR_DVG)/%.o,$(SRC_FILES)) $(OBJDIR_DVG)/advmame_rc.o $(OBJDIR_DVG)/cfg_file.o $(OBJDIR_DVG)/dvg_cmd.o $(OBJDIR_DVG)/dvg_serial_linux.o
+OBJS_SDL = $(patsubst %.cpp,$(OBJDIR_SDL)/%.o,$(SRC_FILES)) $(OBJDIR_SDL)/advmame_rc.o $(OBJDIR_SDL)/cfg_file.o $(OBJDIR_SDL)/keyboard_leds.o
+OBJS_DVG = $(patsubst %.cpp,$(OBJDIR_DVG)/%.o,$(SRC_FILES)) $(OBJDIR_DVG)/advmame_rc.o $(OBJDIR_DVG)/cfg_file.o $(OBJDIR_DVG)/dvg_cmd.o $(OBJDIR_DVG)/dvg_serial_linux.o $(OBJDIR_DVG)/keyboard_leds.o
 
 DEPS_SDL = $(OBJS_SDL:.o=.d)
 DEPS_DVG = $(OBJS_DVG:.o=.d)
@@ -78,6 +78,12 @@ $(OBJDIR_DVG)/dvg_cmd.o: $(DVG_UTILS)/dvg_cmd.cpp | $(OBJDIR_DVG)
 
 $(OBJDIR_DVG)/dvg_serial_linux.o: $(DVG_UTILS)/dvg_serial_linux.cpp | $(OBJDIR_DVG)
 	$(CXX) $(CXXFLAGS_DVG) -I$(DVG_UTILS) -c $< -o $@
+
+$(OBJDIR_SDL)/keyboard_leds.o: $(DVG_UTILS)/keyboard_leds.cpp | $(OBJDIR_SDL)
+	$(CXX) $(CXXFLAGS_SDL) -c $< -o $@
+
+$(OBJDIR_DVG)/keyboard_leds.o: $(DVG_UTILS)/keyboard_leds.cpp | $(OBJDIR_DVG)
+	$(CXX) $(CXXFLAGS_DVG) -c $< -o $@
 
 PREFIX = /usr/local/share/advance
 
