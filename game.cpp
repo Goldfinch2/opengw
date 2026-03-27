@@ -457,12 +457,12 @@ void game::run()
 
     // Keyboard LED feedback
     if (mGameMode == GAMEMODE_CREDITED) {
-        // Blink SCROLLLOCK while waiting for start
+        // Blink NUMLOCK while waiting for start
         ++mLedBlinkTimer;
         if (mLedBlinkTimer >= 30) mLedBlinkTimer = 0;
-        mLeds.set(mLedBlinkTimer < 15 ? KeyboardLeds::SCROLLLOCK : 0);
+        mLeds.set(mLedBlinkTimer < 15 ? KeyboardLeds::NUMLOCK : 0);
     } else if (mGameMode == GAMEMODE_PLAYING) {
-        mLeds.set(KeyboardLeds::SCROLLLOCK);
+        mLeds.set(KeyboardLeds::NUMLOCK);
     } else {
         mLedBlinkTimer = 0;
         mLeds.set(0);
