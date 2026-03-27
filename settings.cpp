@@ -118,7 +118,7 @@ void settings::load()
         const char* rcPath = advmamerc[0] ? advmamerc : "/home/pi/.advance/advmame.rc";
         AdvmameRC rc;
         if (advmameLoad(rcPath, rc)) {
-            if (!rc.config.rendererPort.empty()) {
+            if (rc.config.isDvgEnabled()) {
                 strncpy(serialPort, rc.config.rendererPort.c_str(), sizeof(serialPort) - 1);
                 serialPort[sizeof(serialPort) - 1] = '\0';
                 debuglog::log(true, "Serial port from %s: %s\n", rcPath, serialPort);
