@@ -202,41 +202,23 @@ void highscore::drawEnterScore()
     pen.lineRadius = 8;
     font::AlphanumericsPrint(font::ALIGN_CENTER, .02, 0, .1, &pen, "Please Enter Your Initials");
 
-    // Name edit area
+    // Name edit area — draw each letter separately with spacing
     {
-        if (mEditCurrentPos == 0) {
-            pen = vector::pen(1, 1, 1, 1, 3);
-            font::AlphanumericsPrint(font::ALIGN_CENTER, .06, -.1, -.2, &pen, "%c", charList[mEditCurrentLetter[0]]);
-        } else {
-            pen = vector::pen(1, 1, 1, .5, 3);
-            font::AlphanumericsPrint(font::ALIGN_CENTER, .06, -.1, -.2, &pen, "%c", charList[mEditCurrentLetter[0]]);
+        float letterSize = .06;
+        float spacing = .2;
+        float startX = -spacing;
+
+        for (int p = 0; p < 3; p++) {
+            float lx = startX + p * spacing;
+            pen = (mEditCurrentPos == p) ? vector::pen(1, 1, 1, 1, 3)
+                                         : vector::pen(1, 1, 1, .5, 3);
+            font::AlphanumericsPrint(font::ALIGN_CENTER, letterSize, lx, -.2, &pen, "%c", charList[mEditCurrentLetter[p]]);
+
+            // Underline
+            pen = (mEditCurrentPos == p) ? vector::pen(1, 1, 1, 1, 3)
+                                         : vector::pen(1, 1, 1, .2, 3);
+            font::AlphanumericsPrint(font::ALIGN_CENTER, letterSize, lx, -.28, &pen, "_");
         }
-
-        if (mEditCurrentPos == 1) {
-            pen = vector::pen(1, 1, 1, 1, 3);
-            font::AlphanumericsPrint(font::ALIGN_CENTER, .06, 0, -.2, &pen, "%c", charList[mEditCurrentLetter[1]]);
-        } else {
-            pen = vector::pen(1, 1, 1, .5, 3);
-            font::AlphanumericsPrint(font::ALIGN_CENTER, .06, 0, -.2, &pen, "%c", charList[mEditCurrentLetter[1]]);
-        }
-
-        if (mEditCurrentPos == 2) {
-            pen = vector::pen(1, 1, 1, 1, 3);
-            font::AlphanumericsPrint(font::ALIGN_CENTER, .06, .1, -.2, &pen, "%c", charList[mEditCurrentLetter[2]]);
-        } else {
-            pen = vector::pen(1, 1, 1, .5, 3);
-            font::AlphanumericsPrint(font::ALIGN_CENTER, .06, .1, -.2, &pen, "%c", charList[mEditCurrentLetter[2]]);
-        }
-
-        // Underlines
-        pen = (mEditCurrentPos == 0) ? vector::pen(1, 1, 1, 1, 3) : vector::pen(1, 1, 1, .2, 3);
-        font::AlphanumericsPrint(font::ALIGN_CENTER, .06, -.1, -.22, &pen, "%c", '_');
-
-        pen = (mEditCurrentPos == 1) ? vector::pen(1, 1, 1, 1, 3) : vector::pen(1, 1, 1, .2, 3);
-        font::AlphanumericsPrint(font::ALIGN_CENTER, .06, 0, -.22, &pen, "%c", '_');
-
-        pen = (mEditCurrentPos == 2) ? vector::pen(1, 1, 1, 1, 3) : vector::pen(1, 1, 1, .2, 3);
-        font::AlphanumericsPrint(font::ALIGN_CENTER, .06, .1, -.22, &pen, "%c", '_');
     }
 
     pen = defaultFontPen;
@@ -285,26 +267,27 @@ void highscore::drawTable()
 
 void highscore::load()
 {
-    FILE* pFile;
-    pFile = fopen(settings::get().saveFile("scores.sav").c_str(), "rb");
-    if (pFile) {
-        size_t ret = fread(mEntries, 1, sizeof(mEntries), pFile);
-        if (ret <= 0) {
-            debuglog::log(true,"fread() returned %zu\n", ret);
+    FILE* f = fopen(settings::get().saveFile("highscores.txt").c_str(), "r");
+    if (f) {
+        for (int i = 0; i < 10; i++) {
+            char name[4];
+            int score;
+            if (fscanf(f, "%3s %d", name, &score) == 2) {
+                strcpy(mEntries[i].name, name);
+                mEntries[i].score = score;
+            }
         }
-        fclose(pFile);
+        fclose(f);
     }
 }
 
 void highscore::save()
 {
-    FILE* pFile;
-    pFile = fopen(settings::get().saveFile("scores.sav").c_str(), "wb");
-    if (pFile) {
-        size_t ret = fwrite(mEntries, 1, sizeof(mEntries), pFile);
-        if (ret <= 0) {
-            debuglog::log(true,"fwrite() returned %zu\n", ret);
+    FILE* f = fopen(settings::get().saveFile("highscores.txt").c_str(), "w");
+    if (f) {
+        for (int i = 0; i < 10; i++) {
+            fprintf(f, "%s %d\n", mEntries[i].name, mEntries[i].score);
         }
-        fclose(pFile);
+        fclose(f);
     }
 }

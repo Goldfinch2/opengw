@@ -228,9 +228,9 @@ void scene::draw(int pass)
             vector::pen pen = defaultFontPen;
             float attractScale = .025;
             if (game::mGameMode == game::GAMEMODE_ATTRACT && settings::get().mCreditsPerGame > 0) {
-                font::AlphanumericsPrint(font::ALIGN_CENTER, attractScale, 0, 0, &pen, "INSERT COIN");
+                font::AlphanumericsPrint(font::ALIGN_CENTER, attractScale, 0, .7, &pen, "INSERT COIN");
             } else if (game::mGameMode == game::GAMEMODE_CREDITED || settings::get().mCreditsPerGame == 0) {
-                font::AlphanumericsPrint(font::ALIGN_CENTER, attractScale, 0, 0, &pen, "PRESS START");
+                font::AlphanumericsPrint(font::ALIGN_CENTER, attractScale, 0, .7, &pen, "PRESS START");
                 if (settings::get().mCreditsPerGame > 0)
                     drawCredits();
             }

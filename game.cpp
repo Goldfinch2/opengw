@@ -299,14 +299,10 @@ void game::run()
 
         ++mGameOverTimer;
         if (mGameOverTimer > 180) {
-            /*
-                            // TURNING OFF HIGH SCORES FOR NOW UNTIL I FIGURE OUT A WAY TO DO THEM WITH MULTIPLAYER
-
-                                    if (numPlayers() == 1)
-                                                    game::mGameMode = game::GAMEMODE_HIGHSCORES_CHECK;
-                            else // TODO - MULTIPLAYER HIGH SCORES?????
-            */
-            mGameMode = GAMEMODE_ATTRACT;
+            if (numPlayers() == 1)
+                mGameMode = GAMEMODE_HIGHSCORES_CHECK;
+            else
+                mGameMode = GAMEMODE_ATTRACT;
             mCamera->mCurrentZoom = 1;
 
             // Reset player so next game starts clean
