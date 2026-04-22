@@ -88,12 +88,29 @@ $(OBJDIR_DVG)/keyboard_leds.o: $(DVG_UTILS)/keyboard_leds.cpp | $(OBJDIR_DVG)
 PREFIX = /usr/local/share/advance
 
 install: all
+	@if findmnt -t overlay /usr/local/share/advance >/dev/null 2>&1 \
+	    || systemctl is-active --quiet usr-local-share-advance.automount; then \
+	    echo "ERROR: overlay is active on /usr/local/share/advance."; \
+	    echo "       Writes would be captured in the upper layer, not the raw"; \
+	    echo "       install tree. Run these three commands instead:"; \
+	    echo ""; \
+	    echo "           sudo /home/pi/vectorpiemenu/overlay/overlay-stop.sh"; \
+	    echo "           sudo make -f makefile.linux install"; \
+	    echo "           sudo /home/pi/vectorpiemenu/overlay/overlay-start.sh"; \
+	    echo ""; \
+	    exit 1; \
+	fi
+	@if [ "$$(stat -c %i /usr/local/share/advance)" != "$$(stat -c %i /var/local/overlay_advance/lower)" ]; then \
+	    echo "ERROR: /usr/local/share/advance is not bound to /var/local/overlay_advance/lower."; \
+	    echo "       Install would land in an empty mount point, not the base tree."; \
+	    echo "       Run: sudo /home/pi/vectorpiemenu/overlay/overlay-stop.sh"; \
+	    exit 1; \
+	fi
 	install -d $(PREFIX)
 	install -d $(PREFIX)/artwork
 	install -d $(PREFIX)/opengw_dir/sounds
 	install -m 755 opengw_sdl opengw_dvg $(PREFIX)/
 	install -m 644 opengw.cfg $(PREFIX)/
-	install -m 644 images/opengw.png $(PREFIX)/artwork/
 	install -m 644 sounds/*.wav $(PREFIX)/opengw_dir/sounds/
 
 clean:
