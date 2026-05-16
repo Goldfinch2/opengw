@@ -127,6 +127,22 @@ static void dvgShowMarquee()
         srcPtr = &srcRect;
         dst = { 0, 0, winW, winH };
     }
+    else if (mode == MARQUEE_MODE_FIT_WIDTH)
+    {
+        // Scale to window width, preserve aspect; crops height when artwork
+        // is taller than window aspect, letterboxes when shorter.
+        int dstW = winW;
+        int dstH = (int)((float)h * scaleX);
+        dst = { 0, (winH - dstH) / 2, dstW, dstH };
+    }
+    else if (mode == MARQUEE_MODE_FIT_HEIGHT)
+    {
+        // Scale to window height, preserve aspect; crops width when artwork
+        // is wider than window aspect, pillarboxes when narrower.
+        int dstH = winH;
+        int dstW = (int)((float)w * scaleY);
+        dst = { (winW - dstW) / 2, 0, dstW, dstH };
+    }
     else // MARQUEE_MODE_FIT (default)
     {
         float scale = (scaleX < scaleY) ? scaleX : scaleY;

@@ -127,6 +127,10 @@ void settings::load()
                 marqueeDisplayMode = MARQUEE_MODE_STRETCH;
             else if (rc.config.marqueeDisplayMode == "zoom")
                 marqueeDisplayMode = MARQUEE_MODE_ZOOM;
+            else if (rc.config.marqueeDisplayMode == "fit_width")
+                marqueeDisplayMode = MARQUEE_MODE_FIT_WIDTH;
+            else if (rc.config.marqueeDisplayMode == "fit_height")
+                marqueeDisplayMode = MARQUEE_MODE_FIT_HEIGHT;
             else
                 marqueeDisplayMode = MARQUEE_MODE_FIT;
             debuglog::log(true, "Marquee display mode: %d\n", marqueeDisplayMode);

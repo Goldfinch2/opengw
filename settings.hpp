@@ -5,9 +5,11 @@
 #include "advmame_rc.h"
 
 // Marquee display mode constants
-static constexpr int MARQUEE_MODE_FIT     = 0;
-static constexpr int MARQUEE_MODE_STRETCH = 1;
-static constexpr int MARQUEE_MODE_ZOOM    = 2;
+static constexpr int MARQUEE_MODE_FIT        = 0;
+static constexpr int MARQUEE_MODE_STRETCH    = 1;
+static constexpr int MARQUEE_MODE_ZOOM       = 2;
+static constexpr int MARQUEE_MODE_FIT_WIDTH  = 3;
+static constexpr int MARQUEE_MODE_FIT_HEIGHT = 4;
 
 class settings
 {
