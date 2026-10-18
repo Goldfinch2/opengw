@@ -1,13 +1,23 @@
 #include "settings.hpp"
 #include "debuglog.h"
 
+#include <vectorpie/vp.h>
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 static std::unique_ptr<settings> instance;
+static settings::Output s_output = settings::DVG;
+
+void settings::setOutput(Output output)
+{
+    s_output = output;
+}
 
 const settings& settings::get()
 {
@@ -22,8 +32,6 @@ settings::settings()
 {
     mCreditsPerGame = false; // false = Freeplay
 
-    mEnableGlow = true;
-
     mGridSmoothing = false;
     mParticleSmoothing = false;
     mEnemySmoothing = false;
@@ -32,137 +40,108 @@ settings::settings()
 
     mAttractors = 50;
     mGridPasses = 4;
-
-    serialPort[0] = '\0';
     sortVectors = true;
-    marqueeDisplayMode = MARQUEE_MODE_FIT;
 
-    marquee[0] = '\0';
-    advmamerc[0] = '\0';
-    sounds[0] = '\0';
-    save[0] = '\0';
-
-#if defined(USE_DVG_RENDERER)
+    // the board's (a window takes [sdl]'s from game.ini)
     mParticles = 100;
     gridSpacing = 10;
-    targetFps = 40;
-    dvgRefreshRate = 40;
-#else
-    mParticles = 3000;
-    gridSpacing = 4;
-    targetFps = 60;
-    dvgRefreshRate = 40;
-#endif
 
     load();
 }
 
-// Helper: read from build-specific section first, fall back to global
-static std::string cfgGet(const CfgFile& cfg, const std::string& sec, const std::string& key, const std::string& def) {
-    if (cfg.hasKey(sec, key)) return cfg.getString(sec, key, def);
-    return cfg.getString("", key, def);
-}
-static int cfgGetI(const CfgFile& cfg, const std::string& sec, const std::string& key, int def) {
-    if (cfg.hasKey(sec, key)) return cfg.getInt(sec, key, def);
-    return cfg.getInt("", key, def);
-}
-static bool cfgGetB(const CfgFile& cfg, const std::string& sec, const std::string& key, bool def) {
-    if (cfg.hasKey(sec, key)) return cfg.getBool(sec, key, def);
-    return cfg.getBool("", key, def);
+// game.ini: section -> key -> value ("" is the global section: the game's
+// keys come after the package's). "key = value" lines; a comment (';' or
+// '#') at the start of a line or after a space.
+typedef std::map<std::string, std::map<std::string, std::string>> Cfg;
+
+static bool readCfg(Cfg& cfg)
+{
+    char path[1024];
+    FILE* f = std::fopen(vp_asset_path("game.ini", path, sizeof path), "r");
+    if (!f) return false;
+    std::string section;
+    char line[512];
+    while (std::fgets(line, sizeof line, f)) {
+        char* p = line;
+        while (*p == ' ' || *p == '\t') p++;
+        for (char* c = p; *c; c++)
+            if ((*c == ';' || *c == '#') && (c == p || c[-1] == ' ' || c[-1] == '\t')) { *c = '\0'; break; }
+        char* e = p + std::strlen(p);
+        while (e > p && (e[-1] == '\n' || e[-1] == '\r' || e[-1] == ' ' || e[-1] == '\t')) *--e = '\0';
+        if (*p == '\0') continue;
+        if (*p == '[') {
+            char* close = std::strchr(p, ']');
+            if (close) section.assign(p + 1, close);
+            continue;
+        }
+        char* eq = std::strchr(p, '=');
+        if (!eq) continue;
+        char* k = eq;
+        while (k > p && (k[-1] == ' ' || k[-1] == '\t')) k--;
+        char* v = eq + 1;
+        while (*v == ' ' || *v == '\t') v++;
+        cfg[section][std::string(p, k)] = v;
+    }
+    std::fclose(f);
+    return true;
 }
 
-static void cfgCopyStr(const CfgFile& cfg, const std::string& sec, const std::string& key, char* dst, size_t dstSize) {
-    std::string val = cfgGet(cfg, sec, key, "");
-    if (!val.empty()) snprintf(dst, dstSize, "%s", val.c_str());
+// The sections to look in, first to last: the output's, then the global.
+typedef std::vector<std::string> Sections;
+
+static const std::string* get(const Cfg& cfg, const Sections& secs, const char* key)
+{
+    for (const std::string& s : secs) {
+        auto it = cfg.find(s);
+        if (it == cfg.end()) continue;
+        auto k = it->second.find(key);
+        if (k != it->second.end()) return &k->second;
+    }
+    return nullptr;
+}
+
+static void getI(const Cfg& cfg, const Sections& sec, const char* key, int& out)
+{
+    if (const std::string* v = get(cfg, sec, key)) out = std::atoi(v->c_str());
+}
+
+static void getB(const Cfg& cfg, const Sections& sec, const char* key, bool& out)
+{
+    if (const std::string* v = get(cfg, sec, key))
+        out = *v == "true" || *v == "1" || *v == "yes" || *v == "on";
 }
 
 void settings::load()
 {
-    CfgFile cfg;
-    if (!cfg.load("opengw.cfg")) {
-        debuglog::log(true, "opengw.cfg not found, using defaults\n");
+    Cfg cfg;
+    const Sections sec = s_output == WINDOW ? Sections { "sdl", "" }
+                       : s_output == DVG    ? Sections { "dvg", "" }
+                                            : Sections { "beamforge", "dvg", "" };
+    if (!readCfg(cfg)) {
+        debuglog::log(true, "game.ini not found, using defaults\n");
         return;
     }
 
-    debuglog::log(true, "Loading opengw.cfg\n");
-
-#if defined(USE_DVG_RENDERER)
-    const std::string sec = "dvg";
-#else
-    const std::string sec = "sdl";
-#endif
-
-    mEnableGlow        = cfgGetB(cfg, sec, "enable_glow",        mEnableGlow);
-    mGridSmoothing     = cfgGetB(cfg, sec, "grid_smoothing",     mGridSmoothing);
-    mParticleSmoothing = cfgGetB(cfg, sec, "particle_smoothing", mParticleSmoothing);
-    mEnemySmoothing    = cfgGetB(cfg, sec, "enemy_smoothing",    mEnemySmoothing);
-    mPlayerSmoothing   = cfgGetB(cfg, sec, "player_smoothing",   mPlayerSmoothing);
-    mStarSmoothing     = cfgGetB(cfg, sec, "star_smoothing",     mStarSmoothing);
-    mAttractors        = cfgGetI(cfg, sec, "attractors",         mAttractors);
-    mParticles         = cfgGetI(cfg, sec, "particles",          mParticles);
-    mGridPasses        = cfgGetI(cfg, sec, "grid_passes",        mGridPasses);
-    gridSpacing        = cfgGetI(cfg, sec, "grid_spacing",       gridSpacing);
-    mCreditsPerGame    = cfgGetB(cfg, sec, "credits_per_game",   mCreditsPerGame);
-    targetFps          = cfgGetI(cfg, sec, "target_fps",         targetFps);
-    sortVectors        = cfgGetB(cfg, sec, "sort_vectors",       sortVectors);
-    dvgRefreshRate     = cfgGetI(cfg, sec, "dvg_refresh_rate",   dvgRefreshRate);
-
-    cfgCopyStr(cfg, sec, "marquee",   marquee,   sizeof(marquee));
-    cfgCopyStr(cfg, sec, "advmamerc", advmamerc, sizeof(advmamerc));
-    cfgCopyStr(cfg, sec, "sounds",    sounds,    sizeof(sounds));
-    cfgCopyStr(cfg, sec, "save",      save,      sizeof(save));
-
-#if defined(USE_DVG_RENDERER)
-    // Read serial port and display mode from advmame.rc
-    {
-        const char* rcPath = advmamerc[0] ? advmamerc : "/home/pi/.advance/advmame.rc";
-        AdvmameRC rc;
-        if (advmameLoad(rcPath, rc)) {
-            if (rc.config.isDvgEnabled()) {
-                strncpy(serialPort, rc.config.rendererPort.c_str(), sizeof(serialPort) - 1);
-                serialPort[sizeof(serialPort) - 1] = '\0';
-                debuglog::log(true, "Serial port from %s: %s\n", rcPath, serialPort);
-            }
-            if (rc.config.marqueeDisplayMode == "stretch")
-                marqueeDisplayMode = MARQUEE_MODE_STRETCH;
-            else if (rc.config.marqueeDisplayMode == "zoom")
-                marqueeDisplayMode = MARQUEE_MODE_ZOOM;
-            else if (rc.config.marqueeDisplayMode == "fit_width")
-                marqueeDisplayMode = MARQUEE_MODE_FIT_WIDTH;
-            else if (rc.config.marqueeDisplayMode == "fit_height")
-                marqueeDisplayMode = MARQUEE_MODE_FIT_HEIGHT;
-            else
-                marqueeDisplayMode = MARQUEE_MODE_FIT;
-            debuglog::log(true, "Marquee display mode: %d\n", marqueeDisplayMode);
-        }
-    }
-#endif
-}
-
-std::string settings::marqueeFile() const
-{
-    std::string dir = marquee[0] ? marquee : "artwork";
-    std::string primary = dir + "/opengw.png";
-
-    FILE* f = fopen(primary.c_str(), "r");
-    if (f) {
-        fclose(f);
-        return primary;
-    }
-
-    return dir + "/default.png";
+    getB(cfg, sec, "grid_smoothing",     mGridSmoothing);
+    getB(cfg, sec, "particle_smoothing", mParticleSmoothing);
+    getB(cfg, sec, "enemy_smoothing",    mEnemySmoothing);
+    getB(cfg, sec, "player_smoothing",   mPlayerSmoothing);
+    getB(cfg, sec, "star_smoothing",     mStarSmoothing);
+    getI(cfg, sec, "attractors",         mAttractors);
+    getI(cfg, sec, "particles",          mParticles);
+    getI(cfg, sec, "grid_passes",        mGridPasses);
+    getI(cfg, sec, "grid_spacing",       gridSpacing);
+    getB(cfg, sec, "credits_per_game",   mCreditsPerGame);
+    getB(cfg, sec, "sort_vectors",       sortVectors);
+    debuglog::log(true, "settings: game.ini, section [%s]\n", sec[0].c_str());
 }
 
 std::string settings::soundFile(const char* filename) const
 {
-    if (sounds[0])
-        return std::string(sounds) + "/" + filename;
     return std::string("sounds/") + filename;
 }
 
 std::string settings::saveFile(const char* filename) const
 {
-    if (save[0])
-        return std::string(save) + "/" + filename;
-    return std::string(filename);
+    return std::string(vp_save_dir()) + "/" + filename;
 }

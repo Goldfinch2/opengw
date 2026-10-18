@@ -1,4 +1,5 @@
 #include "attractor.hpp"
+#include <vectorpie/vp.h>
 #include "blackholes.hpp"
 #include "bomb.hpp"
 #include "debuglog.h"
@@ -151,7 +152,6 @@ game::game()
         mAttractModeBlackHoles[i]->setDrift(speedVector);
     }
 
-    mLeds.init();
 
     mGameMode = GAMEMODE_ATTRACT;
 
@@ -451,17 +451,17 @@ void game::run()
         }
     }
 
-    // Keyboard LED feedback
+    // The start lamp (the SDK's cabinet lamps): blinking while waiting
+    // for start, lit in play
     if (mGameMode == GAMEMODE_CREDITED) {
-        // Blink NUMLOCK while waiting for start
         ++mLedBlinkTimer;
         if (mLedBlinkTimer >= 30) mLedBlinkTimer = 0;
-        mLeds.set(mLedBlinkTimer < 15 ? KeyboardLeds::NUMLOCK : 0);
+        vp_lamps_set(mLedBlinkTimer < 15 ? VP_LAMP_START1 : 0);
     } else if (mGameMode == GAMEMODE_PLAYING) {
-        mLeds.set(KeyboardLeds::NUMLOCK);
+        vp_lamps_set(VP_LAMP_START1);
     } else {
         mLedBlinkTimer = 0;
-        mLeds.set(0);
+        vp_lamps_set(0);
     }
 
     mGrid->run();

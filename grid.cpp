@@ -14,6 +14,8 @@
 #include "settings.hpp"
 
 #include <atomic>
+#include <chrono>
+#include <thread>
 //#include <mutex>
 #include <vector>
 
@@ -48,7 +50,7 @@ static SDL_mutex* game::mAttractors.mMutex;
 static SDL_mutex* mDrawMutex;
 */
 
-static SDL_Thread* mRunThread = nullptr;
+static std::thread mRunThread;
 static std::atomic_bool mRunFlag { false };
 static std::atomic_bool quitFlag { false };
 
@@ -68,7 +70,7 @@ static std::vector<GridPoint> mGrid;
 
 // #define GRID_GLOW // PERFORMANCE: Making the grid glow causes us to have to draw it twice, which is slower. This is also defined in game.cpp!
 
-static int runThread(void* /*ptr*/)
+static void runThread()
 {
     profiler prof("grid");
 
@@ -76,7 +78,7 @@ static int runThread(void* /*ptr*/)
 
     while (!quitFlag) {
         while (!mRunFlag && !quitFlag) {
-            SDL_Delay(1);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         mRunFlag = false;
 
@@ -171,8 +173,6 @@ static int runThread(void* /*ptr*/)
     }
 
     debuglog::log(true,"Grid thread exiting\n");
-
-    return 0;
 }
 
 grid::grid()
@@ -199,20 +199,16 @@ grid::grid()
     initializeElements();
 
     // Thread stuff
-    mRunThread = SDL_CreateThread(runThread, "grid", nullptr);
-    if (!mRunThread) {
-        debuglog::log(true,"Couldn't create grid run thread: %s\n", SDL_GetError());
-    }
+    mRunThread = std::thread(runThread);
 }
 
 grid::~grid()
 {
     quitFlag = true;
 
-    int status = 0;
-    SDL_WaitThread(mRunThread, &status);
+    if (mRunThread.joinable()) mRunThread.join();
 
-    debuglog::log(true,"Grid thread exited with status %d\n", status);
+    debuglog::log(true,"Grid thread exited\n");
 }
 
 void grid::initializeVertices()

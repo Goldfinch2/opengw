@@ -12,12 +12,13 @@
 #include "scene.hpp"
 
 #include <atomic>
+#include <chrono>
+#include <thread>
 #include <cstdio>
 //#include <mutex>
 
-#include <SDL2/SDL.h>
 
-static SDL_Thread* mRunThread = nullptr;
+static std::thread mRunThread;
 static std::atomic_bool mRunFlag { false };
 static std::atomic_bool quitFlag { false };
 
@@ -26,7 +27,7 @@ std::size_t particle::mIndex = 0;
 
 // static std::mutex m;
 
-static int runThread(void* /*ptr*/)
+static void runThread()
 {
     debuglog::log(true,"Particle thread running\n");
 
@@ -34,7 +35,7 @@ static int runThread(void* /*ptr*/)
 
     while (!quitFlag) {
         while (!mRunFlag && !quitFlag) {
-            SDL_Delay(1);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         mRunFlag = false;
 
@@ -112,8 +113,6 @@ static int runThread(void* /*ptr*/)
     }
 
     debuglog::log(true,"Particle thread exiting\n");
-
-    return 0;
 }
 
 particle::particle()
@@ -128,20 +127,16 @@ particle::particle()
     }
 
     // Thread stuff
-    mRunThread = SDL_CreateThread(runThread, "particle", nullptr);
-    if (!mRunThread) {
-        debuglog::log(true,"Couldn't create particle run thread: %s\n", SDL_GetError());
-    }
+    mRunThread = std::thread(runThread);
 }
 
 particle::~particle()
 {
     quitFlag = true;
 
-    int status = 0;
-    SDL_WaitThread(mRunThread, &status);
+    if (mRunThread.joinable()) mRunThread.join();
 
-    debuglog::log(true,"Particle thread exited with status %d\n", status);
+    debuglog::log(true,"Particle thread exited\n");
 
     for (auto& p: mParticles) {
         p.timeToLive = 0;

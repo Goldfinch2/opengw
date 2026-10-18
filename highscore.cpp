@@ -3,11 +3,14 @@
 #include "font.hpp"
 #include "game.hpp"
 #include "highscore.hpp"
+
+#include <vectorpie/vp.h>
 #include "players.hpp"
 #include "scene.hpp"
 #include "settings.hpp"
 
 #include <cstdio>
+#include <cstring>
 
 extern scene g_scene;
 extern vector::pen defaultFontPen;
@@ -159,20 +162,8 @@ void highscore::run()
 
 void highscore::addHighScore(char* name, int score)
 {
-    for (int i = 0; i < 10; i++) {
-        if (score >= mEntries[i].score) {
-            // Move all the previous entries down and drop the last entry off the list
-            for (int j = 10 - 2; j >= i; j--) {
-                strcpy(mEntries[j + 1].name, mEntries[j].name);
-                mEntries[j + 1].score = mEntries[j].score;
-            }
-
-            // Plop the new score in-place
-            strcpy(mEntries[i].name, name);
-            mEntries[i].score = score;
-            break;
-        }
-    }
+    vp_hiscore_insert(name, score);
+    load();
 }
 
 void highscore::drawEnterScore()
@@ -265,29 +256,27 @@ void highscore::drawTable()
     }
 }
 
+// The table is the SDK's (save/highscores.txt, the file the VectorPie menu
+// shows), saved as each score goes in. Names there are A-Z 0-9 . - : a
+// blank is '.', shown here as a blank again.
 void highscore::load()
 {
-    FILE* f = fopen(settings::get().saveFile("highscores.txt").c_str(), "r");
-    if (f) {
-        for (int i = 0; i < 10; i++) {
-            char name[4];
-            int score;
-            if (fscanf(f, "%3s %d", name, &score) == 2) {
-                strcpy(mEntries[i].name, name);
-                mEntries[i].score = score;
-            }
+    vp_score table[VP_HISCORE_MAX];
+    const int n = vp_hiscore_load(table);
+    for (int i = 0; i < 10; i++) {
+        if (i < n) {
+            snprintf(mEntries[i].name, sizeof mEntries[i].name, "%s", table[i].name);
+            for (char* c = mEntries[i].name; *c; c++)
+                if (*c == '.') *c = ' ';
+            mEntries[i].score = table[i].score;
+        } else {
+            strcpy(mEntries[i].name, "   ");
+            mEntries[i].score = 0;
         }
-        fclose(f);
     }
 }
 
+// Each score is saved as it goes in (addHighScore).
 void highscore::save()
 {
-    FILE* f = fopen(settings::get().saveFile("highscores.txt").c_str(), "w");
-    if (f) {
-        for (int i = 0; i < 10; i++) {
-            fprintf(f, "%s %d\n", mEntries[i].name, mEntries[i].score);
-        }
-        fclose(f);
-    }
 }

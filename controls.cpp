@@ -1,343 +1,61 @@
 #include "controls.hpp"
-#include "debuglog.h"
-#include "settings.hpp"
 
-#include <SDL2/SDL.h>
+#include <cmath>
 
-extern const Uint8* keyboardState;
-
-// CONTROLLER VALUES
-constexpr float AXIS_MAX = 32768.f;
+// Below this an analog stick counts as centered.
 constexpr float CLAMPVALUE = .3f;
 
-controls::controls()
-{
-    debuglog::log(true,"Initing controls\n");
+static vp_input* s_in;
 
-    // If advmame.rc is configured, use its input bindings
-    const auto& cfg = settings::get();
-    if (cfg.advmamerc[0]) {
-        mInputMap = std::make_unique<InputMap>();
-        mInputMap->load(cfg.advmamerc);
-        mInputMap->openJoysticks();
-    } else {
-        // Fall back to SDL gamepad API
-        scanForGamepads();
+controls::controls() {}
+controls::~controls() {}
+
+void controls::setInput(vp_input* in)
+{
+    s_in = in;
+}
+
+static bool held(const char* action)
+{
+    return s_in && vp_input_held(s_in, action);
+}
+
+// x = up (+1), y = left (+1): the digital directions at full deflection, plus
+// the analog stick (which reports up and left negative).
+static Point3d stick(const char* up, const char* down, const char* left, const char* right,
+                     const char* axisX, const char* axisY)
+{
+    Point3d v(0, 0, 0);
+    if (held(up))    v.x += 1;
+    if (held(down))  v.x -= 1;
+    if (held(left))  v.y += 1;
+    if (held(right)) v.y -= 1;
+    if (s_in) {
+        float ax = -vp_input_axis(s_in, axisY), ay = -vp_input_axis(s_in, axisX);
+        if (std::fabs(ax) >= CLAMPVALUE) v.x += ax;
+        if (std::fabs(ay) >= CLAMPVALUE) v.y += ay;
     }
+    return v;
 }
 
-controls::~controls()
+Point3d controls::getLeftStick(int /*player*/)
 {
-    for (auto& pad: mGamepads) {
-        if (pad) {
-            SDL_GameControllerClose(pad);
-            pad = nullptr;
-        }
-    }
+    return stick("p1_up", "p1_down", "p1_left", "p1_right", "p1_stickx", "p1_sticky");
 }
 
-void controls::scanForGamepads()
+Point3d controls::getRightStick(int /*player*/)
 {
-    int count = SDL_NumJoysticks();
-
-    debuglog::log(true,"Scanning for gamepads... Found %d joysticks\n", count);
-
-    // Open any available gamepads
-    for (int j = 0; j < count && mNumGamepads < MAX_GAMEPADS; j++) {
-        if (SDL_IsGameController(j)) {
-            // Check if this device is already opened
-            bool alreadyOpen = false;
-
-            for (auto& pad: mGamepads) {
-                if (pad) {
-                    SDL_Joystick* joy = SDL_GameControllerGetJoystick(pad);
-                    if (SDL_JoystickInstanceID(joy) == j) {
-                        alreadyOpen = true;
-                        break;
-                    }
-                }
-            }
-
-            if (!alreadyOpen) {
-                // Find first free slot
-                for (int i = 0; i < MAX_GAMEPADS; i++) {
-                    if (!mGamepads[i]) {
-                        mGamepads[i] = SDL_GameControllerOpen(j);
-                        if (mGamepads[i]) {
-                            debuglog::log(true,"Gamepad %d: %s\n", i,
-                                   SDL_GameControllerName(mGamepads[i]));
-                            mNumGamepads++;
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    debuglog::log(true,"Total gamepads opened: %d\n", mNumGamepads);
+    return stick("p2_up", "p2_down", "p2_left", "p2_right", "p2_stickx", "p2_sticky");
 }
 
-void controls::handleGamepadAdded(SDL_JoystickID instanceId)
-{
-    if (!SDL_IsGameController(instanceId))
-        return;
-
-    // Find first available slot
-    for (int i = 0; i < MAX_GAMEPADS; i++) {
-        if (!mGamepads[i]) {
-            mGamepads[i] = SDL_GameControllerOpen(instanceId);
-            if (mGamepads[i]) {
-                debuglog::log(true,"Gamepad connected in slot %d: %s\n", i,
-                       SDL_GameControllerName(mGamepads[i]));
-                mNumGamepads++;
-            } else {
-                debuglog::log(true,"Failed to open gamepad %d: %s\n", instanceId, SDL_GetError());
-            }
-            break;
-        }
-    }
-}
-
-void controls::handleGamepadRemoved(SDL_JoystickID instanceId)
-{
-    // Find and remove the disconnected gamepad
-    for (int i = 0; i < MAX_GAMEPADS; i++) {
-        if (mGamepads[i]) {
-            SDL_Joystick* joy = SDL_GameControllerGetJoystick(mGamepads[i]);
-            if (SDL_JoystickInstanceID(joy) == instanceId) {
-                debuglog::log(true,"Gamepad disconnected from slot %d\n", i);
-                SDL_GameControllerClose(mGamepads[i]);
-                mGamepads[i] = nullptr;
-                mNumGamepads--;
-                break;
-            }
-        }
-    }
-}
-
-Point3d controls::getLeftStick(int player)
-{
-    if (mInputMap) {
-        int x = 0, y = 0;
-        if (mInputMap->isActive(GameAction::MOVE_UP))    x += 1;
-        if (mInputMap->isActive(GameAction::MOVE_DOWN))  x -= 1;
-        if (mInputMap->isActive(GameAction::MOVE_LEFT))  y += 1;
-        if (mInputMap->isActive(GameAction::MOVE_RIGHT)) y -= 1;
-        return Point3d(x, y, 0);
-    }
-    return readKeyboardLeftStick(player) + readGamepadLeftStick(player);
-}
-
-Point3d controls::getRightStick(int player)
-{
-    if (mInputMap) {
-        int x = 0, y = 0;
-        if (mInputMap->isActive(GameAction::AIM_UP))    x += 1;
-        if (mInputMap->isActive(GameAction::AIM_DOWN))  x -= 1;
-        if (mInputMap->isActive(GameAction::AIM_LEFT))  y += 1;
-        if (mInputMap->isActive(GameAction::AIM_RIGHT)) y -= 1;
-        return Point3d(x, y, 0);
-    }
-    return readKeyboardRightStick(player) + readGamepadRightStick(player);
-}
-
-bool controls::getTriggerButton(int player)
-{
-    if (mInputMap)
-        return mInputMap->isActive(GameAction::FIRE);
-    return readKeyboardTrigger(player) || readGamepadTrigger(player);
-}
+bool controls::getTriggerButton(int /*player*/) { return held("p1_button1"); }
 
 bool controls::getStartButton(int player)
 {
-    if (mInputMap) {
-        switch (player) {
-        case 0: return mInputMap->isActive(GameAction::START_P1);
-        case 1: return mInputMap->isActive(GameAction::START_P2);
-        case 2: return mInputMap->isActive(GameAction::START_P3);
-        case 3: return mInputMap->isActive(GameAction::START_P4);
-        }
-        return false;
-    }
-    return readKeyboardStart(player) || readGamepadStart(player);
+    static const char* const start[4] = { "start1", "start2", "start3", "start4" };
+    return player >= 0 && player < 4 && held(start[player]);
 }
 
-bool controls::getBackButton(int player)
-{
-    if (mInputMap)
-        return mInputMap->isActive(GameAction::BACK);
-    return readKeyboardBack(player) || readGamepadBack(player);
-}
-
-bool controls::getPauseButton(int player)
-{
-    if (mInputMap)
-        return mInputMap->isActive(GameAction::PAUSE);
-    return readKeyboardPause(player) || readGamepadPause(player);
-}
-
-bool controls::getExitButton()
-{
-    if (mInputMap)
-        return mInputMap->isActive(GameAction::EXIT);
-    const Uint8* keystate = SDL_GetKeyboardState(NULL);
-    return keystate && keystate[SDL_SCANCODE_ESCAPE];
-}
-
-//
-// Keyboard controller
-//
-Point3d controls::readKeyboardLeftStick(int /*player*/)
-{
-    bool up = keyboardState[SDL_SCANCODE_W];
-    bool down = keyboardState[SDL_SCANCODE_S];
-    bool left = keyboardState[SDL_SCANCODE_A];
-    bool right = keyboardState[SDL_SCANCODE_D];
-
-    int x = 0;
-    int y = 0;
-
-    x += up ? 1 : 0;
-    x -= down ? 1 : 0;
-
-    y += left ? 1 : 0;
-    y -= right ? 1 : 0;
-
-    return Point3d(x, y, 0);
-}
-
-Point3d controls::readKeyboardRightStick(int /*player*/)
-{
-    bool up = keyboardState[SDL_SCANCODE_UP];
-    bool down = keyboardState[SDL_SCANCODE_DOWN];
-    bool left = keyboardState[SDL_SCANCODE_LEFT];
-    bool right = keyboardState[SDL_SCANCODE_RIGHT];
-
-    int x = 0;
-    int y = 0;
-
-    x += up ? 1 : 0;
-    x -= down ? 1 : 0;
-
-    y += left ? 1 : 0;
-    y -= right ? 1 : 0;
-
-    return Point3d(x, y, 0);
-}
-
-bool controls::readKeyboardTrigger(int /*player*/)
-{
-    return keyboardState[SDL_SCANCODE_SPACE] || keyboardState[SDL_SCANCODE_LCTRL];
-}
-
-bool controls::readKeyboardStart(int player)
-{
-    switch (player) {
-    case 0:
-        return keyboardState[SDL_SCANCODE_1];
-    case 1:
-        return keyboardState[SDL_SCANCODE_2];
-    case 2:
-        return keyboardState[SDL_SCANCODE_3];
-    case 3:
-        return keyboardState[SDL_SCANCODE_4];
-    }
-    return false;
-}
-
-bool controls::readKeyboardBack(int /*player*/)
-{
-    return keyboardState[SDL_SCANCODE_BACKSPACE];
-}
-
-bool controls::readKeyboardPause(int /*player*/)
-{
-    return keyboardState[SDL_SCANCODE_P];
-}
-
-//
-// Modern SDL GameController API
-//
-
-Point3d controls::readGamepadLeftStick(int player)
-{
-    if (!mGamepads[player])
-        return Point3d(0, 0, 0);
-
-    Point3d vector;
-    // Note: Y axis is inverted for standard game controls
-    vector.x = -(SDL_GameControllerGetAxis(mGamepads[player], SDL_CONTROLLER_AXIS_LEFTY)) / AXIS_MAX;
-    vector.y = -(SDL_GameControllerGetAxis(mGamepads[player], SDL_CONTROLLER_AXIS_LEFTX)) / AXIS_MAX;
-    vector.z = 0;
-
-    // Apply deadzone
-    if (fabs(vector.x) < CLAMPVALUE) {
-        vector.x = 0;
-    }
-    if (fabs(vector.y) < CLAMPVALUE) {
-        vector.y = 0;
-    }
-
-    return vector;
-}
-
-Point3d controls::readGamepadRightStick(int player)
-{
-    if (!mGamepads[player])
-        return Point3d(0, 0, 0);
-
-    Point3d vector;
-    vector.x = -(SDL_GameControllerGetAxis(mGamepads[player], SDL_CONTROLLER_AXIS_RIGHTY)) / AXIS_MAX;
-    vector.y = -(SDL_GameControllerGetAxis(mGamepads[player], SDL_CONTROLLER_AXIS_RIGHTX)) / AXIS_MAX;
-    vector.z = 0;
-
-    // Apply deadzone
-    if (fabs(vector.x) < CLAMPVALUE) {
-        vector.x = 0;
-    }
-    if (fabs(vector.y) < CLAMPVALUE) {
-        vector.y = 0;
-    }
-
-    return vector;
-}
-
-bool controls::readGamepadTrigger(int player)
-{
-    if (!mGamepads[player])
-        return false;
-
-    // Right trigger
-    float triggerVal = (SDL_GameControllerGetAxis(mGamepads[player], SDL_CONTROLLER_AXIS_TRIGGERRIGHT)) / AXIS_MAX;
-
-    if (triggerVal > CLAMPVALUE) {
-        return true;
-    }
-
-    return false;
-}
-
-bool controls::readGamepadStart(int player)
-{
-    if (!mGamepads[player])
-        return false;
-
-    return SDL_GameControllerGetButton(mGamepads[player], SDL_CONTROLLER_BUTTON_A);
-}
-
-bool controls::readGamepadBack(int player)
-{
-    if (!mGamepads[player])
-        return false;
-
-    return SDL_GameControllerGetButton(mGamepads[player], SDL_CONTROLLER_BUTTON_B);
-}
-
-bool controls::readGamepadPause(int player)
-{
-    if (!mGamepads[player])
-        return false;
-
-    return SDL_GameControllerGetButton(mGamepads[player], SDL_CONTROLLER_BUTTON_START);
-}
+bool controls::getBackButton(int /*player*/)  { return held("coin1"); }
+bool controls::getPauseButton(int /*player*/) { return held("ui_pause"); }
+bool controls::getExitButton()                { return false; }

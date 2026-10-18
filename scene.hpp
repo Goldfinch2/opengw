@@ -1,7 +1,6 @@
 #pragma once
 
 #include "model.hpp"
-#include "texture.hpp"
 
 class scene
 {
@@ -49,5 +48,4 @@ class scene
 
     model mShieldSymbol;
 
-    texture mTextureMarquee;
 };

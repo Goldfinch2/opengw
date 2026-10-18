@@ -1,17 +1,21 @@
 #pragma once
 
-// Renderer abstraction: compile-time switch between backends
-// Default: OpenGL 1.x
-// Define USE_DVG_RENDERER for DVG hardware vector output
+#include <vectorpie/vp.h>
+
+// The game's drawing, on the VectorPie SDK (renderer_vp.cpp): the vector
+// board or a window, the same picture.
 
 namespace renderer
 {
-    // Initialization / shutdown
-    void init(int width, int height);
+    // vertical: a vertically mounted monitor (y squeezed into its middle 3/4)
+    void init(bool vertical);
     void shutdown();
 
+    // The SDK's output for the frame being drawn (NULL between frames).
+    void setOutput(vp_dvg* d);
+
     // Frame management
-    void beginFrame(int width, int height);
+    void beginFrame();
     void present();
 
     // State
@@ -51,12 +55,12 @@ namespace renderer
     void endPoints();
     void pointVertex(float x, float y, float r, float g, float b, float a);
 
-    // Triangle fan (for filled circles - black holes)
+    // Triangle fan (filled circles: not drawn on vectors)
     void beginTriangleFan();
     void endTriangleFan();
     void triangleFanVertex(float x, float y);
 
-    // Filled quad
+    // Filled quad (its outline)
     void drawQuad(float x1, float y1, float x2, float y2,
                   float x3, float y3, float x4, float y4,
                   float r, float g, float b, float a);

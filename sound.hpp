@@ -1,14 +1,18 @@
 #pragma once
 
-#include <SDL2/SDL.h>
+#include <vectorpie/vp.h>
 
-#include <vector>
+#include <cstddef>
 
+// The game's sounds: numbered tracks, each played on its own voice (playing a
+// track again restarts it), through the VectorPie SDK's audio.
 class sound
 {
   public:
     sound();
     ~sound();
+
+    static void setAudio(vp_audio* audio);     // NULL: silent
 
     void loadTrack(const char* file, std::size_t track, float volume, bool loop = false);
     void playTrack(std::size_t track);
@@ -27,26 +31,4 @@ class sound
     void stopSound();
 
     void setTrackSpeed(std::size_t track, double speed);
-
-  private:
-    static void bufferCallback(void* userdata, Uint8* stream, int len);
-
-    struct TRACK
-    {
-        std::vector<Sint16> data;
-        bool loop = false;
-        bool playing = false;
-        bool paused = false;
-        float vol = 0.0f;
-        double speed = 0.0;
-        double pos = 0.0;
-        Uint32 len = 0;
-    };
-
-    std::vector<TRACK> mTracks;
-
-    std::vector<float> mLeftSamples;
-    std::vector<float> mRightSamples;
-
-    SDL_AudioDeviceID mAudioDevice { 0 };
 };

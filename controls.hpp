@@ -1,17 +1,22 @@
 #pragma once
 
-#include "inputmap.hpp"
 #include "point3d.hpp"
 
-#include <SDL2/SDL.h>
+#include <vectorpie/vp.h>
 
-#include <memory>
-
+// The cabinet's controls through the VectorPie SDK (advmame.rc actions, the
+// ones the game's own input map used): move on the p1 directions and the p1
+// stick, aim on the p2 directions and the p2 stick, fire p1_button1, start1
+// to start4, coin1 (credit), ui_pause. ui_cancel (back to the menu) is the
+// SDK's own.
 class controls
 {
   public:
     controls();
     ~controls();
+
+    // the SDK's input, read before each game step (OpenGW.cpp)
+    static void setInput(vp_input* in);
 
     Point3d getLeftStick(int player);
     Point3d getRightStick(int player);
@@ -19,35 +24,5 @@ class controls
     bool getStartButton(int player);
     bool getBackButton(int player);
     bool getPauseButton(int player);
-    bool getExitButton();
-
-    // Hot-plugging support
-    void handleGamepadAdded(SDL_JoystickID instanceId);
-    void handleGamepadRemoved(SDL_JoystickID instanceId);
-    void scanForGamepads();
-
-  private:
-    // Keyboard
-    Point3d readKeyboardLeftStick(int player);
-    Point3d readKeyboardRightStick(int player);
-    bool readKeyboardTrigger(int player);
-    bool readKeyboardStart(int player);
-    bool readKeyboardBack(int player);
-    bool readKeyboardPause(int player);
-
-    // Gamepads (modern API)
-    Point3d readGamepadLeftStick(int player);
-    Point3d readGamepadRightStick(int player);
-    bool readGamepadTrigger(int player);
-    bool readGamepadStart(int player);
-    bool readGamepadBack(int player);
-    bool readGamepadPause(int player);
-
-    static constexpr int MAX_GAMEPADS { 4 };
-
-    SDL_GameController* mGamepads[MAX_GAMEPADS] {};
-    int mNumGamepads { 0 };
-
-    // advmame.rc input mapping (used when configured, replaces keyboard/gamepad)
-    std::unique_ptr<InputMap> mInputMap;
+    bool getExitButton();       // the SDK handles ui_cancel: always false
 };

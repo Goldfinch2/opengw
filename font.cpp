@@ -5,6 +5,7 @@
 #include <cstdio>
 
 #include "renderer.h"
+#include <cstring>
 
 static float cursorX = 0, cursorY = 0;
 static const float xcell = 1.9;

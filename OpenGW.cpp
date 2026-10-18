@@ -1,597 +1,87 @@
+// OpenGW.cpp: the entry point. OpenGW on the VectorPie SDK: vp_run owns the
+// loop. The game steps 60 times a second (scene::run, after the controls are
+// read) and draws at the output's rate (scene::draw through renderer_vp.cpp),
+// on the vector board (frame_hz in game.ini's [dvg] for the USB-DVG,
+// [beamforge] for BeamForge) or in a window. The exit button returns to the
+// VectorPie menu; the SDK closes everything.
+
 #include "controls.hpp"
 #include "debuglog.h"
 #include "game.hpp"
+#include "renderer.h"
 #include "scene.hpp"
 #include "settings.hpp"
 #include "sincos.hpp"
+#include "sound.hpp"
 
-#include <SDL2/SDL.h>
+#include <vectorpie/vp.h>
 
-#include <cstdio>
-#include <memory>
-
-// Shared globals
-static SDL_Window* window;
-static int mWidth, mHeight;
-const Uint8* keyboardState;
-
-#if !defined(USE_DVG_RENDERER)
-#include "blur.hpp"
-
-#include <SDL2/SDL_opengl.h>
-
-#ifdef __APPLE__
-#include <OpenGL/glu.h>
-#else
-#include <GL/glu.h>
-#endif
-
-// declare image buffers
-#ifdef __amigaos4__
-// MiniGL / Warp3D requires power of two size
-static constexpr int blurBufferWidth = 256;
-static constexpr int blurBufferHeight = 256;
-#else
-static constexpr int blurBufferWidth = 500;
-static constexpr int blurBufferHeight = 250;
-#endif
-
-static std::vector<ColorRGB> blurBuffer(blurBufferWidth * blurBufferHeight);
-
-static SDL_GLContext context;
-static bool oglInited = false;
-static unsigned int texOffscreen;
-
-static void createContext(int width, int height);
-static void destroyContext();
-static void resizeViewport(int cx, int cy);
-static void createOffscreens();
-static void drawOffscreens();
-
-#define CONTEXT_PRIMARY 0
-#define CONTEXT_GLOW    1
-
-static Uint32 lastTime;
-static Uint32 fpsTime;
-static int frameCount;
-static int fps;
-static void updateFps(Uint32 now);
-
-#else // USE_DVG_RENDERER
-
-#include "font.hpp"
-#include "highscore.hpp"
-#include "lodepng.h"
-#include "players.hpp"
-#include "renderer.h"
-
-static SDL_Renderer* g_dvgRenderer = nullptr;
-static SDL_Texture*  g_marqueeTexture = nullptr;
-
-static void dvgShowMarquee()
-{
-    if (!g_dvgRenderer) return;
-
-    std::vector<unsigned char> image;
-    unsigned w, h;
-    std::string marqueeFile = settings::get().marqueeFile();
-    unsigned error = lodepng::decode(image, w, h, marqueeFile);
-    if (error)
-    {
-        debuglog::log(true, "Marquee: %s not found (%s)\n",
-                      marqueeFile.c_str(), lodepng_error_text(error));
-        return;
-    }
-
-    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormatFrom(
-        image.data(), (int)w, (int)h, 32, (int)(w * 4), SDL_PIXELFORMAT_RGBA32);
-    if (!surface)
-    {
-        debuglog::log(true, "Marquee: SDL_CreateRGBSurfaceWithFormatFrom failed: %s\n", SDL_GetError());
-        return;
-    }
-
-    g_marqueeTexture = SDL_CreateTextureFromSurface(g_dvgRenderer, surface);
-    SDL_FreeSurface(surface);
-
-    if (!g_marqueeTexture)
-    {
-        debuglog::log(true, "Marquee: SDL_CreateTextureFromSurface failed: %s\n", SDL_GetError());
-        return;
-    }
-
-    int winW, winH;
-    SDL_GetWindowSize(window, &winW, &winH);
-
-    const int mode = settings::get().getMarqueeDisplayMode();
-
-    float scaleX = (float)winW / (float)w;
-    float scaleY = (float)winH / (float)h;
-
-    SDL_Rect* srcPtr = nullptr;
-    SDL_Rect srcRect;
-    SDL_Rect dst;
-
-    if (mode == MARQUEE_MODE_STRETCH)
-    {
-        // Fill entire window, ignore aspect ratio
-        dst = { 0, 0, winW, winH };
-    }
-    else if (mode == MARQUEE_MODE_ZOOM)
-    {
-        // Fill entire window, preserve aspect ratio, crop excess
-        float scale = (scaleX > scaleY) ? scaleX : scaleY;
-        float visW = (float)winW / scale;
-        float visH = (float)winH / scale;
-        srcRect = { (int)(((float)w - visW) / 2.0f), (int)(((float)h - visH) / 2.0f), (int)visW, (int)visH };
-        srcPtr = &srcRect;
-        dst = { 0, 0, winW, winH };
-    }
-    else if (mode == MARQUEE_MODE_FIT_WIDTH)
-    {
-        // Scale to window width, preserve aspect; crops height when artwork
-        // is taller than window aspect, letterboxes when shorter.
-        int dstW = winW;
-        int dstH = (int)((float)h * scaleX);
-        dst = { 0, (winH - dstH) / 2, dstW, dstH };
-    }
-    else if (mode == MARQUEE_MODE_FIT_HEIGHT)
-    {
-        // Scale to window height, preserve aspect; crops width when artwork
-        // is wider than window aspect, pillarboxes when narrower.
-        int dstH = winH;
-        int dstW = (int)((float)w * scaleY);
-        dst = { (winW - dstW) / 2, 0, dstW, dstH };
-    }
-    else // MARQUEE_MODE_FIT (default)
-    {
-        float scale = (scaleX < scaleY) ? scaleX : scaleY;
-        int dstW = (int)((float)w * scale);
-        int dstH = (int)((float)h * scale);
-        dst = { (winW - dstW) / 2, (winH - dstH) / 2, dstW, dstH };
-    }
-
-    // Render twice for kmsdrm double-buffering
-    for (int i = 0; i < 2; i++)
-    {
-        SDL_SetRenderDrawColor(g_dvgRenderer, 0, 0, 0, 255);
-        SDL_RenderClear(g_dvgRenderer);
-        SDL_RenderCopy(g_dvgRenderer, g_marqueeTexture, srcPtr, &dst);
-        SDL_RenderPresent(g_dvgRenderer);
-    }
-
-    debuglog::log(true, "Marquee: displayed %s (%ux%u)\n", marqueeFile.c_str(), w, h);
-}
-
-static void dvgClearMarquee()
-{
-    if (g_marqueeTexture)
-    {
-        SDL_DestroyTexture(g_marqueeTexture);
-        g_marqueeTexture = nullptr;
-    }
-    if (g_dvgRenderer)
-    {
-        SDL_SetRenderDrawColor(g_dvgRenderer, 0, 0, 0, 255);
-        SDL_RenderClear(g_dvgRenderer);
-        SDL_RenderPresent(g_dvgRenderer);
-    }
-}
-
-#endif // !USE_DVG_RENDERER
-
-static bool handleEvents()
-{
-    SDL_Event e;
-    while (SDL_PollEvent(&e)) {
-        switch (e.type) {
-        case SDL_QUIT:
-            return false;
-        case SDL_KEYDOWN:
-            break;
-#if !defined(USE_DVG_RENDERER)
-        case SDL_WINDOWEVENT:
-            if (e.window.event == SDL_WINDOWEVENT_RESIZED)
-                resizeViewport(e.window.data1, e.window.data2);
-            break;
-#endif
-        case SDL_CONTROLLERDEVICEADDED:
-            theGame->mControls->handleGamepadAdded(e.cdevice.which);
-            break;
-        case SDL_CONTROLLERDEVICEREMOVED:
-            theGame->mControls->handleGamepadRemoved(e.cdevice.which);
-            break;
-        }
-    }
-
-    SDL_JoystickUpdate();
-    keyboardState = SDL_GetKeyboardState(NULL);
-
-    if (theGame->mControls->getExitButton())
-        return false;
-
-    return true;
-}
-
-// ============================================================================
-// SDL / OpenGL build
-// ============================================================================
-#if !defined(USE_DVG_RENDERER)
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
 
 extern scene g_scene;
 
-static void run()
+// VP_VERTICAL=1: a vertically mounted monitor (the SDK shapes its window so)
+static bool vertical()
 {
-    if (!oglInited)
-        return;
-
-    constexpr Uint32 logicRate = 60;
-    constexpr Uint32 logicPeriod = 1000 / logicRate;
-
-    const Uint32 targetFps = settings::get().targetFps;
-    const Uint32 framePeriod = 1000 / targetFps;
-
-    Uint32 lastLogicUpdate = SDL_GetTicks();
-    Uint32 lastFrameTime = SDL_GetTicks();
-
-    bool running = true;
-
-    while (running) {
-        const Uint32 now = SDL_GetTicks();
-
-        if (now - lastFrameTime < framePeriod)
-            continue;
-        lastFrameTime = now;
-
-        while ((now - lastLogicUpdate) > logicPeriod) {
-            lastLogicUpdate += logicPeriod;
-            if (!handleEvents()) {
-                running = false;
-            }
-
-            g_scene.run();
-        }
-
-        drawOffscreens();
-
-        SDL_GL_SwapWindow(window);
-        updateFps(now);
-    }
+    const char* v = std::getenv("VP_VERTICAL");
+    return v && v[0] == '1';
 }
 
-int main(int /*argc*/, char** /*argv*/)
+static int init(vp_game* g)
 {
-    debuglog::init();
-    debuglog::log(true, "OpenGW SDL\n");
-
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
-        // No display server — try KMSDRM
-        SDL_SetHint(SDL_HINT_VIDEODRIVER, "kmsdrm");
-        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
-            debuglog::log(true, "SDL_Init failed: %s\n", SDL_GetError());
-            return 0;
-        }
-        debuglog::log(true, "No display server, using kmsdrm video driver\n");
-    }
-
-    SDL_ShowCursor(SDL_DISABLE);
-
-    // Detect display resolution
-    int displayWidth = 800;
-    int displayHeight = 600;
-    {
-        SDL_DisplayMode dm;
-        if (SDL_GetCurrentDisplayMode(0, &dm) == 0) {
-            displayWidth = dm.w;
-            displayHeight = dm.h;
-            debuglog::log(true, "Display mode: %dx%d\n", displayWidth, displayHeight);
-        }
-    }
-
-    Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN_DESKTOP;
-
-    window = SDL_CreateWindow("OpenGW",
-                              SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                              displayWidth, displayHeight, flags);
-
-    if (window) {
-        srand(SDL_GetTicks());
-        make_sin_cos_tables();
-        g_scene.init();
-        createContext(displayWidth, displayHeight);
-        run();
-        g_scene.shutdown();
-        destroyContext();
-
-        SDL_DestroyWindow(window);
-    } else {
-        debuglog::log(true, "Failed to create window: %s\n", SDL_GetError());
-    }
-
-    debuglog::log(true, "SDL_Quit\n");
-    debuglog::close();
-    SDL_Quit();
-
-    return 0;
-}
-
-static void createContext(int width, int height)
-{
-    context = SDL_GL_CreateContext(window);
-
-    if (context == nullptr) {
-        debuglog::log(true, "SDL_GL_CreateContext failed: %s\n", SDL_GetError());
-    }
-
-    resizeViewport(width, height);
-
-    // Do stuff with the context here if needed...
-    createOffscreens();
-
-    if (SDL_GL_SetSwapInterval(0) != 0) {
-        debuglog::log(true, "SDL_GL_SetSwapInterval failed: %s\n", SDL_GetError());
-    }
-
-    if (SDL_GL_MakeCurrent(window, context) != 0) {
-        debuglog::log(true, "SDL_GL_MakeCurrent failed: %s\n", SDL_GetError());
-    }
-
-    oglInited = true;
-}
-
-static void destroyContext()
-{
-    oglInited = false;
-
-    SDL_GL_MakeCurrent(window, NULL);
-    SDL_GL_DeleteContext(context);
-}
-
-static void resizeViewport(int cx, int cy)
-{
-    g_scene.size(cx, cy);
-    mWidth = cx;
-    mHeight = cy;
-}
-
-static void createOffscreens()
-{
-    std::vector<char> colorBits(blurBufferWidth * blurBufferHeight * 3);
-
-    // texture creation..
-    glGenTextures(1, &texOffscreen);
-    glBindTexture(GL_TEXTURE_2D, texOffscreen);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, 3, blurBufferWidth, blurBufferHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, colorBits.data());
-    gluBuild2DMipmaps(GL_TEXTURE_2D, 3, blurBufferWidth, blurBufferHeight, GL_RGB, GL_UNSIGNED_BYTE, colorBits.data());
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-}
-
-static void drawOffscreens()
-{
-    int viewport[4];
-    glGetIntegerv(GL_VIEWPORT, (int*)viewport);
-
-    if (settings::get().mEnableGlow) {
-        // Draw to the blur texture
-        {
-            glViewport(0, 0, blurBufferWidth, blurBufferHeight);
-
-            g_scene.draw(scene::RENDERPASS_BLUR);
-
-            // Transfer image to the blur texture
-            glBindTexture(GL_TEXTURE_2D, texOffscreen);
-            glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 0, 0, blurBufferWidth, blurBufferHeight, 0);
-            glBindTexture(GL_TEXTURE_2D, 0);
-        }
-    }
-
-    // Draw the scene normally
-    glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-    g_scene.draw(scene::RENDERPASS_PRIMARY);
-
-    if (settings::get().mEnableGlow) {
-        ////////////////////////////////////////////////
-        // Do blur
-
-        // Bind the blur texture and copy the screen bits to it
-        glBindTexture(GL_TEXTURE_2D, texOffscreen);
-        glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, blurBuffer.data());
-
-        const int blurRadius = (game::mGameMode == game::GAMEMODE_ATTRACT || game::mGameMode == game::GAMEMODE_CREDITED) ? 8 : 4;
-
-        superFastBlur(blurBuffer.data(), blurBufferWidth, blurBufferHeight, blurRadius);
-        superFastBlur(blurBuffer.data(), blurBufferWidth, blurBufferHeight, blurRadius);
-
-        // Bind the blur result back to our texture
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, blurBufferWidth, blurBufferHeight, GL_RGB, GL_UNSIGNED_BYTE, blurBuffer.data());
-
-        ////////////////////////////////////////////////
-        // Draw the blur texture on top of the existing scene
-
-        // Glowy blending effect
-        glDisable(GL_DEPTH_TEST);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-
-        glEnable(GL_TEXTURE_2D);
-        glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-
-        if (game::mGameMode == game::GAMEMODE_ATTRACT || game::mGameMode == game::GAMEMODE_CREDITED)
-            glColor4f(1, 1, 1, 1);
-        else
-            glColor4f(1, 1, 1, 1);
-
-        // Draw it on the screen
-        glBegin(GL_QUADS);
-        glTexCoord2d(0.0, 0.0);
-        glVertex2d(-1.0, -1.0);
-        glTexCoord2d(1.0, 0.0);
-        glVertex2d(1.0, -1.0);
-        glTexCoord2d(1.0, 1.0);
-        glVertex2d(1.0, 1.0);
-        glTexCoord2d(0.0, 1.0);
-        glVertex2d(-1.0, 1.0);
-        if (game::mGameMode == game::GAMEMODE_ATTRACT || game::mGameMode == game::GAMEMODE_CREDITED) {
-            glTexCoord2d(0.0, 0.0);
-            glVertex2d(-1.0, -1.0);
-            glTexCoord2d(1.0, 0.0);
-            glVertex2d(1.0, -1.0);
-            glTexCoord2d(1.0, 1.0);
-            glVertex2d(1.0, 1.0);
-            glTexCoord2d(0.0, 1.0);
-            glVertex2d(-1.0, 1.0);
-        }
-        glEnd();
-
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glDisable(GL_TEXTURE_2D);
-    }
-}
-
-static void updateFps(Uint32 now)
-{
-    ++frameCount;
-
-    lastTime = now;
-
-    if ((now - fpsTime) > 1000) {
-        fpsTime = now;
-        fps = (fps + frameCount) / 2;
-        frameCount = 0;
-    }
-}
-
-// ============================================================================
-// DVG build
-// ============================================================================
-#else // USE_DVG_RENDERER
-
-extern scene g_scene;
-
-static void run()
-{
-    constexpr Uint32 logicRate = 60;
-    constexpr Uint32 logicPeriod = 1000 / logicRate;
-
-    const Uint32 targetFps = settings::get().dvgRefreshRate;
-    const Uint32 framePeriod = 1000 / targetFps;
-
-    Uint32 lastLogicUpdate = SDL_GetTicks();
-    Uint32 lastFrameTime = SDL_GetTicks();
-
-    bool running = true;
-
-    while (running) {
-        const Uint32 now = SDL_GetTicks();
-
-        if (now - lastFrameTime < framePeriod)
-            continue;
-        lastFrameTime = now;
-
-        // Run game logic at 60Hz
-        while ((now - lastLogicUpdate) > logicPeriod) {
-            lastLogicUpdate += logicPeriod;
-            if (!handleEvents())
-                running = false;
-
-            theGame->run();
-        }
-
-        // Render
-        renderer::beginFrame(mWidth, mHeight);
-
-        scene::mPass = scene::RENDERPASS_PRIMARY;
-        g_scene.draw(scene::RENDERPASS_PRIMARY);
-
-        renderer::present();
-    }
-}
-
-int main(int /*argc*/, char** /*argv*/)
-{
-    debuglog::init();
-    debuglog::log(true, "OpenGW DVG\n");
-
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
-        SDL_SetHint(SDL_HINT_VIDEODRIVER, "kmsdrm");
-        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
-            debuglog::log(true, "SDL_Init failed: %s\n", SDL_GetError());
-            return 1;
-        }
-        debuglog::log(true, "No display server, using kmsdrm video driver\n");
-    }
-
-    SDL_ShowCursor(SDL_DISABLE);
-
-    // Detect display resolution (used for aspect ratio calculation)
-    mWidth = 800;
-    mHeight = 600;
-    {
-        SDL_DisplayMode dm;
-        if (SDL_GetCurrentDisplayMode(0, &dm) == 0) {
-            mWidth = dm.w;
-            mHeight = dm.h;
-            debuglog::log(true, "Display: %dx%d\n", mWidth, mHeight);
-        }
-    }
-
-    // Create a minimal window (needed for SDL event loop and gamepad)
-    window = SDL_CreateWindow("OpenGW DVG",
-                              SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                              mWidth, mHeight,
-                              SDL_WINDOW_FULLSCREEN_DESKTOP);
-    if (!window) {
-        debuglog::log(true, "Failed to create window: %s\n", SDL_GetError());
-        debuglog::close();
-        SDL_Quit();
-        return 1;
-    }
-
-    // Create SDL renderer for marquee display on the Pi's screen
-    g_dvgRenderer = SDL_CreateRenderer(window, -1, 0);
-    if (g_dvgRenderer)
-        dvgShowMarquee();
-    else
-        debuglog::log(true, "SDL_CreateRenderer failed: %s\n", SDL_GetError());
-
-    srand(SDL_GetTicks());
+    debuglog::log(true, "== opengw boot ==\n");
+    // The settings' section: [sdl] in a window, [dvg] or [beamforge] on a board.
+    vp_dvg* out = vp_game_output(g);
+    settings::setOutput(vp_dvg_get_output(out) != VP_DVG_OUTPUT_BOARD ? settings::WINDOW
+                        : vp_dvg_hardware(out) == VP_HW_BEAMFORGE ? settings::BEAMFORGE
+                        : settings::DVG);
+    std::srand((unsigned int)std::time(nullptr));
     make_sin_cos_tables();
-
+    renderer::init(vertical());
+    sound::setAudio(vp_game_audio(g));
+    controls::setInput(vp_game_input(g));
     g_scene.init();
-
-    debuglog::log(true, "Game created, gameMode=%d gameType=%d\n", game::mGameMode, game::mGameType);
-    debuglog::log(true, "Player1 joined=%d state=%d\n", theGame->getPlayer1()->mJoined, theGame->getPlayer1()->getState());
-
-    renderer::init(mWidth, mHeight);
-
-    // DVG display is square — aspect ratio 1:1
+    // The board is square: aspect 1:1, as the DVG build had it.
     g_scene.size(1.0f, 1.0f);
+    return VP_OK;
+}
 
-    debuglog::log(true, "Starting in attract mode (gameMode=%d)\n", game::mGameMode);
+static void update(vp_game* g, float /*dt*/)
+{
+    controls::setInput(vp_game_input(g));
+    g_scene.run();
+}
 
-    run();
+static void draw(vp_game* /*g*/, vp_dvg* d)
+{
+    renderer::setOutput(d);
+    renderer::beginFrame();
+    scene::mPass = scene::RENDERPASS_PRIMARY;
+    g_scene.draw(scene::RENDERPASS_PRIMARY);
+    renderer::present();
+    renderer::setOutput(nullptr);
+}
 
+static void game_shutdown(vp_game* /*g*/)
+{
     g_scene.shutdown();
     renderer::shutdown();
-
-    dvgClearMarquee();
-    if (g_dvgRenderer) {
-        SDL_DestroyRenderer(g_dvgRenderer);
-        g_dvgRenderer = nullptr;
-    }
-
-    debuglog::log(true, "Done\n");
     debuglog::close();
-
-    SDL_DestroyWindow(window);
-    SDL_Quit();
-
-    return 0;
 }
 
-#endif // !USE_DVG_RENDERER
+int main(int argc, char** argv)
+{
+    vp_game_desc desc;
+    std::memset(&desc, 0, sizeof desc);
+    desc.title          = "Geometry Wars";
+    desc.init           = init;
+    desc.update         = update;
+    desc.draw           = draw;
+    desc.shutdown       = game_shutdown;
+    desc.update_hz      = 60;
+    desc.frame_hz       = 60;
+    desc.frame_hz_board = 40;          // game.ini's [dvg] / [beamforge] frame_hz override it
+    return vp_run(&desc, argc, argv);
+}

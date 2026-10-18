@@ -1,8 +1,8 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
 #include <string>
-
-#include <SDL2/SDL.h>
 
 class profiler
 {
@@ -14,9 +14,11 @@ class profiler
     void stop();
 
   private:
+    using clock = std::chrono::steady_clock;
+
     std::string name;
-    Uint64 performanceCounter = 0;
-    Uint64 started = 0;
-    Uint64 runCounter = 0;
-    Uint64 longest = 0;
+    clock::duration total {};
+    clock::time_point started {};
+    uint64_t runCounter = 0;
+    clock::duration longest {};
 };
